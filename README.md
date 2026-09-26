@@ -15,7 +15,7 @@ Build the redesigned unpacked extension into `dist-reborn/`:
 npm run check
 ```
 
-Load `dist-reborn/` from `chrome://extensions` with Developer mode enabled.
+For local loading instructions, see [Install in Chrome](#install-in-chrome).
 
 Build the Classic pipeline into `dist-classic/`:
 
@@ -24,6 +24,28 @@ npm run check:classic
 ```
 
 Load `dist-classic/` separately when comparing the Classic frontend with the legacy extension.
+
+## Install in Chrome
+
+### From a GitHub Release
+
+1. Download either `pushbullet-reborn-<version>.zip` or `pushbullet-classic-<version>-<version_name>.zip` from the GitHub Release.
+2. Extract the ZIP into a local folder. Chrome cannot load the ZIP file directly.
+3. Open `chrome://extensions` in Chrome.
+4. Enable **Developer mode** using the switch in the upper-right corner.
+5. Click **Load unpacked**.
+6. Select the extracted folder that directly contains `manifest.json`. Do not select the ZIP file, the repository root, or a parent folder.
+7. Open the extension from Chrome's Extensions menu and complete authentication in the extension UI.
+
+The Reborn and Classic ZIPs are separate extensions. Load only the variant you want to use, or load both when comparing their behavior.
+
+### From a Local Build
+
+1. Install dependencies with `npm install`.
+2. Build Reborn with `npm run check`, or build Classic with `npm run check:classic`.
+3. Open `chrome://extensions` and enable **Developer mode**.
+4. Click **Load unpacked** and select `dist-reborn/` or `dist-classic/`.
+5. After rebuilding, return to `chrome://extensions` and click **Reload** on the corresponding extension.
 
 ## Current Boundary
 
