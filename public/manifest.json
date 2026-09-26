@@ -1,16 +1,26 @@
 {
   "manifest_version": 3,
+  "default_locale": "en",
   "name": "Pushbullet Reborn (MV3)",
   "version": "0.1.0",
   "description": "A modern Pushbullet client built for Manifest V3.",
+  "icons": { "16": "icon_16.png", "48": "icon_48.png", "128": "icon_128.png" },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Pushbullet Reborn"
+    "default_title": "Pushbullet Reborn",
+    "default_icon": { "16": "icon_16.png", "32": "icon_32.png" }
   },
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "options_page": "options.html",
-  "permissions": ["storage"]
+  "permissions": ["storage", "alarms", "idle", "activeTab", "tabs", "notifications", "offscreen"],
+  "optional_permissions": ["contextMenus"],
+  "commands": {
+    "dismiss-most-recent-notification": { "description": "Dismiss the most recent notification" },
+    "instant-push-current-tab": { "description": "Instantly push the current tab" },
+    "pop-out-panel": { "description": "Open Pushbullet in a separate window" }
+  },
+  "host_permissions": ["https://api.pushbullet.com/*", "https://upload.pushbullet.com/*"]
 }

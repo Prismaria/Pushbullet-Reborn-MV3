@@ -6,9 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:classic": "vite build --mode classic && node scripts/patch-manifest.mjs classic",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run build"
+    "check": "npm run typecheck && npm run build",
+    "unit": "node --no-warnings --experimental-strip-types scripts/unit-smoke.mjs",
+    "smoke": "npm run build && node scripts/worker-smoke.mjs",
+    "artifact": "node scripts/artifact-smoke.mjs",
+    "artifact:classic": "node scripts/artifact-smoke.mjs dist-classic classic",
+    "check:classic": "npm run typecheck && npm run build:classic",
+    "smoke:classic": "npm run build:classic && node scripts/worker-smoke.mjs dist-classic",
+    "verify": "npm run check && npm run unit && npm run smoke && npm run artifact",
+    "verify:classic": "npm run check:classic && npm run unit && npm run smoke:classic && npm run artifact:classic",
+    "verify:all": "npm run verify && npm run verify:classic"
   },
   "dependencies": {
     "react": "^19.1.1",

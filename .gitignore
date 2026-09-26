@@ -1,5 +1,8 @@
 node_modules/
 dist/
+dist-reborn/
+dist-classic/
+release-artifacts/
 .vite/
 *.crx
 *.pem
