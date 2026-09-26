@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/patch-manifest.mjs reborn",
+    "build:reborn": "npm run build",
     "build:classic": "vite build --mode classic && node scripts/patch-manifest.mjs classic",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -14,6 +15,10 @@
     "smoke": "npm run build && node scripts/worker-smoke.mjs",
     "artifact": "node scripts/artifact-smoke.mjs",
     "artifact:classic": "node scripts/artifact-smoke.mjs dist-classic classic",
+    "package:reborn": "npm run build:reborn && node scripts/package-extension.mjs reborn",
+    "package:classic": "npm run build:classic && node scripts/package-extension.mjs classic",
+    "package:all": "npm run build:reborn && npm run build:classic && node scripts/package-extension.mjs all",
+    "validate:release": "node scripts/validate-release.mjs all",
     "check:classic": "npm run typecheck && npm run build:classic",
     "smoke:classic": "npm run build:classic && node scripts/worker-smoke.mjs dist-classic",
     "verify": "npm run check && npm run unit && npm run smoke && npm run artifact",
@@ -30,6 +35,8 @@
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.4",
+    "adm-zip": "^0.6.1",
+    "archiver": "^7.0.1",
     "typescript": "^5.9.2",
     "vite": "^7.1.7"
   }

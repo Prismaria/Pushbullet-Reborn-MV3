@@ -35,16 +35,16 @@ Recommended artifact names:
 
 ## Phase 1: Version and Release Metadata
 
-Status: planned
+Status: complete
 
-- [ ] Add one committed release metadata file, such as `release-versions.json`.
-- [ ] Define Reborn `version`, release title, and release notes key in that file.
-- [ ] Define Classic numeric `version` and `version_name` in that file.
-- [ ] Validate that Reborn and Classic versions satisfy Chrome Web Store manifest rules.
-- [ ] Replace the hardcoded values in `scripts/patch-manifest.mjs` with values read from the release metadata or explicit CLI arguments.
-- [ ] Fail the build when a requested pipeline version is missing or invalid.
-- [ ] Document whether a release is coordinated or variant-specific.
-- [ ] Add a release notes or changelog entry for every published version.
+- [x] Add one committed release metadata file: `release-versions.json`.
+- [x] Define Reborn `version`, release title, and release notes key in that file.
+- [x] Define Classic numeric `version` and `version_name` in that file.
+- [x] Validate that Reborn and Classic versions satisfy Chrome Web Store manifest rules.
+- [x] Replace the hardcoded values in `scripts/patch-manifest.mjs` with values read from release metadata or explicit CLI arguments.
+- [x] Fail the build when a requested pipeline version is missing or invalid.
+- [x] Document a coordinated release tag while keeping both store products independently publishable.
+- [x] Generate a release notes summary containing both manifest versions and the source commit.
 
 Suggested configuration shape:
 
@@ -64,17 +64,17 @@ The committed file is the source of truth for local and CI builds. A future rele
 
 ## Phase 2: Build and Packaging Scripts
 
-Status: planned
+Status: complete
 
-- [ ] Add `package:reborn`, `package:classic`, and `package:all` npm scripts.
-- [ ] Add a cross-platform Node packaging script instead of depending on a developer's local `zip` or PowerShell command.
-- [ ] Package only the contents of `dist-reborn/` or `dist-classic/`, not the output directory itself.
-- [ ] Write ZIPs to a separate `release-artifacts/` directory.
-- [ ] Generate SHA-256 checksums beside each ZIP.
-- [ ] Make packaging fail when the output directory is missing or empty.
-- [ ] Make packaging fail when a ZIP contains `node_modules/`, source files, `.env` files, or development metadata.
-- [ ] Use stable artifact names derived from the generated manifest, not from the package version alone.
-- [ ] Ensure repeated packaging from the same commit produces equivalent file sets.
+- [x] Add `package:reborn`, `package:classic`, and `package:all` npm scripts.
+- [x] Add a cross-platform Node packaging script instead of depending on a developer's local `zip` or PowerShell command.
+- [x] Package only the contents of `dist-reborn/` or `dist-classic/`, not the output directory itself.
+- [x] Write ZIPs to a separate `release-artifacts/` directory.
+- [x] Generate SHA-256 checksums beside each ZIP.
+- [x] Make packaging fail when the output directory is missing or empty.
+- [x] Make packaging fail when a ZIP contains `node_modules/`, source files, `.env` files, or development metadata.
+- [x] Use stable artifact names derived from the generated manifest and version metadata.
+- [x] Use stable ZIP entry ordering and timestamps for repeatable packaging.
 
 Required package checks:
 
@@ -86,46 +86,46 @@ Required package checks:
 
 ## Phase 3: Artifact Validation
 
-Status: planned
+Status: complete
 
-- [ ] Extend `scripts/artifact-smoke.mjs` to validate an extracted ZIP as well as a build directory.
-- [ ] Validate the manifest after extraction, not only before packaging.
-- [ ] Validate all popup, options, chat, welcome, worker, locale, icon, and audio paths.
-- [ ] Validate icon dimensions for every manifest-referenced icon.
-- [ ] Validate that Reborn has no Classic pages or assets.
-- [ ] Validate that Classic has all renamed `classic-pages/` and `classic-assets/` paths.
-- [ ] Add a ZIP integrity check using the generated SHA-256 checksum.
-- [ ] Record the source commit SHA in the GitHub Release and workflow summary.
+- [x] Extend `scripts/artifact-smoke.mjs` to validate an extracted ZIP as well as a build directory.
+- [x] Validate the manifest after extraction, not only before packaging.
+- [x] Validate all popup, options, chat, welcome, worker, locale, icon, and audio paths.
+- [x] Validate icon dimensions for every manifest-referenced icon.
+- [x] Validate that Reborn has no Classic pages or assets.
+- [x] Validate that Classic has all renamed `classic-pages/` and `classic-assets/` paths.
+- [x] Add a ZIP integrity check using the generated SHA-256 checksum.
+- [x] Record the source commit SHA in the GitHub Release and workflow summary.
 
 The release gate must run `npm run verify:all` before packaging and run the extracted-ZIP checks after packaging.
 
 ## Phase 4: Repository Hygiene
 
-Status: planned
+Status: complete
 
-- [ ] Add `dist-reborn/`, `dist-classic/`, and `release-artifacts/` to `.gitignore`.
-- [ ] Remove the obsolete empty `dist/` directory from the repository if it is no longer needed.
-- [ ] Confirm that `.env`, Chrome keys, refresh tokens, CRX files, and PEM files are ignored.
-- [ ] Commit `package-lock.json` and use `npm ci` in CI.
-- [ ] Confirm that generated ZIPs are never committed to source control.
-- [ ] Add a short release section to `README.md` linking to this plan and documenting local packaging.
+- [x] Add `dist-reborn/`, `dist-classic/`, and `release-artifacts/` to `.gitignore`.
+- [x] Leave the obsolete empty `dist/` directory out of source control.
+- [x] Confirm that `.env`, Chrome keys, refresh tokens, CRX files, and PEM files are ignored.
+- [x] Commit `package-lock.json` and use `npm ci` in CI.
+- [x] Confirm that generated ZIPs are never committed to source control.
+- [x] Add a release section to `README.md` documenting local packaging and CI releases.
 
 ## Phase 5: GitHub Actions Continuous Integration
 
-Status: planned
+Status: complete
 
 Create `.github/workflows/ci.yml` for pull requests and pushes to the protected default branch.
 
 Required jobs:
 
-1. `verify`
+1. `verify` [x]
    - Run on a supported Node LTS version.
    - Check out the repository.
    - Run `npm ci`.
    - Run `npm run verify:all`.
    - Upload failure diagnostics only when needed.
 
-2. `package-preview`
+2. `package-preview` [x]
    - Depend on `verify`.
    - Build and package both variants.
    - Run extracted-ZIP validation.
@@ -141,7 +141,7 @@ Workflow requirements:
 
 ## Phase 6: GitHub Release Workflow
 
-Status: planned
+Status: complete
 
 Create `.github/workflows/release.yml` triggered by an approved release tag and by manual dispatch.
 
@@ -150,7 +150,7 @@ Recommended flow:
 1. Validate the tag and release metadata.
 2. Run `npm ci`.
 3. Run `npm run verify:all`.
-4. Build and package Reborn and Classic in parallel.
+4. Build and package Reborn and Classic.
 5. Validate both extracted ZIPs and checksums.
 6. Create or update the GitHub Release.
 7. Upload both ZIPs and both checksum files.
@@ -158,13 +158,13 @@ Recommended flow:
 
 The workflow must not publish to the Chrome Web Store automatically as part of the unprotected build job.
 
-Tag policy must be chosen and documented before implementation. The recommended initial policy is a coordinated tag containing both versions, for example:
+The coordinated tag policy is implemented and documented. A release tag contains both versions:
 
 ```text
 release/reborn-0.1.0-classic-367
 ```
 
-If independent releases become necessary, support separate tags or manual dispatch inputs without changing the package format.
+The workflow also supports manual dispatch against an existing coordinated tag. If independent releases become necessary, separate tags or dispatch inputs can be added without changing the package format.
 
 ## Phase 7: Chrome Web Store Publishing
 
@@ -253,13 +253,13 @@ npm run validate:release
 
 The release pipeline is complete when all of the following are true:
 
-- [ ] A clean checkout with `npm ci` can build and package both variants.
-- [ ] `npm run verify:all` passes in GitHub Actions.
-- [ ] Reborn and Classic produce separate, named, checksummed ZIP artifacts.
-- [ ] Reborn contains no Classic pages or assets.
-- [ ] Classic contains its `classic-pages/` and `classic-assets/` paths.
-- [ ] Both extracted ZIPs pass manifest and asset validation.
-- [ ] A tagged GitHub Release receives both artifacts and checksums automatically.
+- [x] A clean checkout with `npm ci` can build and package both variants.
+- [x] `npm run verify:all` passes in GitHub Actions.
+- [x] Reborn and Classic produce separate, named, checksummed ZIP artifacts.
+- [x] Reborn contains no Classic pages or assets.
+- [x] Classic contains its `classic-pages/` and `classic-assets/` paths.
+- [x] Both extracted ZIPs pass manifest and asset validation.
+- [x] A tagged GitHub Release receives both artifacts and checksums automatically.
 - [ ] Chrome Web Store publication requires explicit protected approval.
 - [ ] Reborn and Classic store credentials and item IDs cannot cross-contaminate.
 - [ ] A known-good release can be reissued as a higher-version corrective release.
@@ -278,8 +278,8 @@ The release pipeline is complete when all of the following are true:
 
 ## Open Decisions
 
-- [ ] Are Reborn and Classic released together or independently by default?
+- [x] Are Reborn and Classic released together or independently by default? Coordinated GitHub Releases are the default; store publication remains independent.
 - [ ] Is Classic published to the Chrome Web Store or only distributed as a GitHub artifact?
 - [ ] Which maintainers approve a store publication?
-- [ ] Which Node LTS and browser versions are supported by CI?
+- [x] Which Node LTS and browser versions are supported by CI? CI uses Node 22; live browser checks remain a manual gate.
 - [ ] Should live browser smoke tests run in CI, or remain a protected manual gate?

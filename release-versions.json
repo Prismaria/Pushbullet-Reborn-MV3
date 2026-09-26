@@ -1,0 +1,15 @@
+{
+  "release": {
+    "title": "Pushbullet Reborn and Classic",
+    "notes_key": "current"
+  },
+  "reborn": {
+    "name": "Pushbullet Reborn (MV3)",
+    "version": "0.1.0"
+  },
+  "classic": {
+    "name": "Pushbullet Classic",
+    "version": "367",
+    "version_name": "367 beta"
+  }
+}

@@ -67,7 +67,11 @@ The service worker migrates the legacy local keys into the `extensionState` sche
 Before release:
 
 1. Run `npm run verify:all`.
-2. Load `dist-reborn/` and `dist-classic/` as separate unpacked extensions and manually exercise authentication, streams, push/link/file sends, notifications, options, chat, SMS/MMS, context menus, commands, sign-out, privacy approval, and worker restart.
-3. Compare Classic against the active legacy extension, then publish using the replacement extension identity.
+2. Run `npm run package:all`.
+3. Run `npm run validate:release` to validate both ZIPs and their checksums.
+4. Load `dist-reborn/` and `dist-classic/` as separate unpacked extensions and manually exercise authentication, streams, push/link/file sends, notifications, options, chat, SMS/MMS, context menus, commands, sign-out, privacy approval, and worker restart.
+5. Compare Classic against the active legacy extension, then publish using the replacement extension identity.
+
+GitHub CI runs `npm run verify:all` on pull requests and packages preview artifacts. A coordinated release tag in the form `release/reborn-<reborn-version>-classic-<classic-version>` runs the release workflow and attaches both verified ZIPs and SHA-256 files to a GitHub Release. Chrome Web Store publishing remains a separate protected step.
 
 The automated checks use mocked Pushbullet responses and do not replace a live-account verification pass.

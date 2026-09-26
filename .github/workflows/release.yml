@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'release/**'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and publish to GitHub Releases
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  verify:
+    name: Verify release source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate release tag
+        run: node scripts/validate-release-tag.mjs "$RELEASE_TAG"
+
+      - name: Run verification gate
+        run: npm run verify:all
+
+  package:
+    name: Package release artifacts
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and package both variants
+        run: npm run package:all
+
+      - name: Validate extracted ZIPs and checksums
+        run: npm run validate:release
+
+      - name: Generate release summary
+        run: node scripts/release-summary.mjs > release-artifacts/RELEASE_NOTES.md
+
+      - name: Upload release artifacts for the release job
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ github.sha }}
+          path: release-artifacts
+          if-no-files-found: error
+          retention-days: 14
+
+  github-release:
+    name: Create GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts-${{ github.sha }}
+          path: release-artifacts
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          body_path: release-artifacts/RELEASE_NOTES.md
+          files: |
+            release-artifacts/*.zip
+            release-artifacts/*.sha256
+          fail_on_unmatched_files: true
+          generate_release_notes: false
