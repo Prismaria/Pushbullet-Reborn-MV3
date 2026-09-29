@@ -5,11 +5,11 @@
   },
   "reborn": {
     "name": "Pushbullet Reborn (MV3)",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "classic": {
     "name": "Pushbullet Classic",
-    "version": "367",
-    "version_name": "367 beta"
+    "version": "368",
+    "version_name": "368 beta"
   }
 }

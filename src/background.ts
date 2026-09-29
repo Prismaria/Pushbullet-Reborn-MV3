@@ -7,7 +7,7 @@ import { ApiError, validateToken } from './background/api'
 import { clearToken, readState, readToken, updateState, writeState, writeToken } from './background/state'
 import { broadcastState } from './background/events'
 import { connectWebSocket, disconnectWebSocket, handleAlarm, handleIdleState, initializeConnection } from './background/connection'
-import { refreshRemoteState } from './background/remote'
+import { loadMorePushHistory, refreshRemoteState } from './background/remote'
 import { clearNativeNotifications, dismissNotification, refreshNotificationBadge, registerNotificationListeners } from './background/notifications'
 import { registerUploadPort } from './background/upload-port'
 import { clearActiveChat, getPhonebook, getSmsThread, getSmsThreads, sendSms, setActiveChat } from './background/sms'
@@ -74,6 +74,8 @@ async function signOut(): Promise<ExtensionState> {
     channels: {},
     grants: {},
     pushes: {},
+    pushHistoryCursor: null,
+    pushHistoryLoadedPages: 0,
     texts: {},
     notifications: {},
     connectionStatus: 'disconnected',
@@ -133,6 +135,8 @@ async function handleMessage(message: ExtensionMessage): Promise<ExtensionRespon
       return { ok: true, state: await signOut() }
     case 'refresh_state':
       return { ok: true, state: await refreshState() }
+    case 'load_more_push_history':
+      return { ok: true, state: await loadMorePushHistory() }
     case 'save_settings':
       return { ok: true, state: await saveSettings(message) }
     case 'send_push': {

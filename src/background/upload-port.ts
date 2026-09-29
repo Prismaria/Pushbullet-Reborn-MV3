@@ -1,4 +1,4 @@
-import { isUploadPortMessage, MAX_UPLOAD_BYTES, UPLOAD_CHUNK_BYTES, type UploadStart } from '../shared/uploads'
+import { decodeUploadChunk, isUploadPortMessage, MAX_UPLOAD_BYTES, UPLOAD_CHUNK_BYTES, type UploadStart } from '../shared/uploads'
 import { uploadAndSendFile, uploadAndSendSms } from './uploads'
 
 function targetFromStart(start: UploadStart): UploadStart['target'] {
@@ -54,11 +54,21 @@ export function registerUploadPort(port: chrome.runtime.Port): void {
     }
 
     if (value.type === 'chunk') {
-      if (!start || value.buffer.byteLength > UPLOAD_CHUNK_BYTES || loaded + value.buffer.byteLength > start.size) {
+      if (!start || value.size > UPLOAD_CHUNK_BYTES || loaded + value.size > start.size) {
         fail('The upload chunk is invalid.')
         return
       }
-      const chunk = new Uint8Array(value.buffer)
+      let chunk: Uint8Array
+      try {
+        chunk = decodeUploadChunk(value.data)
+      } catch {
+        fail('The upload chunk is invalid.')
+        return
+      }
+      if (chunk.byteLength !== value.size) {
+        fail('The upload chunk is invalid.')
+        return
+      }
       chunks.push(chunk)
       loaded += chunk.byteLength
       port.postMessage({ type: 'progress', loaded, total: start.size })

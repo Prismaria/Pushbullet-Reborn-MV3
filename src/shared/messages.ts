@@ -12,6 +12,7 @@ export type ExtensionMessage =
   | { type: 'set_token'; token: string }
   | { type: 'sign_out' }
   | { type: 'refresh_state' }
+  | { type: 'load_more_push_history' }
   | { type: 'save_settings'; settings: Partial<ExtensionSettings> }
   | { type: 'send_push'; push: PushDraft }
   | { type: 'dismiss_notification'; key: string }
@@ -37,7 +38,8 @@ export type MessageResponse<TMessage extends ExtensionMessage> =
     : TMessage extends { type: 'get_state' } ? StateResponse
       : TMessage extends { type: 'set_token' } ? StateResponse
         : TMessage extends { type: 'sign_out' } ? StateResponse
-            : TMessage extends { type: 'refresh_state' } ? StateResponse
+      : TMessage extends { type: 'refresh_state' } ? StateResponse
+        : TMessage extends { type: 'load_more_push_history' } ? StateResponse
               : TMessage extends { type: 'save_settings' } ? StateResponse
                 : TMessage extends { type: 'send_push' } ? PushResponse
                   : TMessage extends { type: 'dismiss_notification' } ? StateResponse
@@ -79,7 +81,7 @@ export function isExtensionMessage(value: unknown): value is ExtensionMessage {
     sms?: unknown
   }
 
-  if (message.type === 'ping' || message.type === 'get_state' || message.type === 'sign_out' || message.type === 'refresh_state') {
+  if (message.type === 'ping' || message.type === 'get_state' || message.type === 'sign_out' || message.type === 'refresh_state' || message.type === 'load_more_push_history') {
     return true
   }
   if (message.type === 'set_token') return typeof message.token === 'string' && message.token.trim().length > 0
@@ -152,10 +154,12 @@ export function toExtensionUser(value: unknown): ExtensionUser {
   return {
     iden: typeof user.iden === 'string' ? user.iden : undefined,
     email: typeof user.email === 'string' ? user.email : undefined,
-    emailNormalized: typeof user.email_normalized === 'string' ? user.email_normalized : undefined,
+    emailNormalized: typeof user.emailNormalized === 'string' ? user.emailNormalized : typeof user.email_normalized === 'string' ? user.email_normalized : undefined,
     name: typeof user.name === 'string' ? user.name : undefined,
-    imageUrl: typeof user.image_url === 'string' ? user.image_url : undefined,
+    imageUrl: typeof user.imageUrl === 'string' ? user.imageUrl : typeof user.image_url === 'string' ? user.image_url : undefined,
     pro: user.pro === true,
-    replyCountQuota: typeof user.reply_count_quota === 'number' || typeof user.reply_count_quota === 'string' ? user.reply_count_quota : undefined
+    replyCountQuota: typeof user.replyCountQuota === 'number' || typeof user.replyCountQuota === 'string'
+      ? user.replyCountQuota
+      : typeof user.reply_count_quota === 'number' || typeof user.reply_count_quota === 'string' ? user.reply_count_quota : undefined
   }
 }

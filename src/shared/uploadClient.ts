@@ -1,5 +1,5 @@
 import type { ExtensionState, PushDraft, SmsSendDraft } from './models'
-import { MAX_UPLOAD_BYTES, UPLOAD_CHUNK_BYTES } from './uploads'
+import { encodeUploadChunk, MAX_UPLOAD_BYTES, UPLOAD_CHUNK_BYTES } from './uploads'
 
 type UploadClientRequest = {
   target: Pick<PushDraft, 'deviceIden' | 'email' | 'channelIden'>
@@ -33,7 +33,7 @@ export async function uploadFileThroughPort(
       if (!message || typeof message !== 'object' || !('type' in message)) return
       const response = message as { type?: unknown; loaded?: unknown; total?: unknown; state?: unknown; error?: unknown }
       if (response.type === 'progress' && typeof response.loaded === 'number' && typeof response.total === 'number') {
-        onProgress(Math.round((response.loaded / response.total) * 100))
+        onProgress(Math.min(90, Math.round((response.loaded / response.total) * 90)))
       } else if (response.type === 'complete' && response.state) {
         finish(() => resolve(response.state as ExtensionState))
       } else if (response.type === 'error') {
@@ -57,8 +57,8 @@ export async function uploadFileThroughPort(
     void (async () => {
       try {
         for (let offset = 0; offset < file.size; offset += UPLOAD_CHUNK_BYTES) {
-          const buffer = await file.slice(offset, Math.min(offset + UPLOAD_CHUNK_BYTES, file.size)).arrayBuffer()
-          port.postMessage({ type: 'chunk', buffer })
+          const bytes = new Uint8Array(await file.slice(offset, Math.min(offset + UPLOAD_CHUNK_BYTES, file.size)).arrayBuffer())
+          port.postMessage({ type: 'chunk', data: encodeUploadChunk(bytes), size: bytes.byteLength })
         }
         port.postMessage({ type: 'complete' })
       } catch (error) {

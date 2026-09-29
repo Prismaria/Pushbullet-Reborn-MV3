@@ -1,0 +1,85 @@
+html,
+body {
+    height: 100%;
+}
+
+button {
+    height: 28px;
+    padding: 0 5px;
+    margin-left: 10px;
+    border: 1px solid transparent;
+}
+
+#header {
+    padding: 15px;
+}
+
+#options {
+    margin-bottom: 40px;
+}
+
+.inner {
+    position: relative;
+}
+
+#account-holder {
+    display: none;
+    position: absolute;
+    top: 0;
+    right: 8px;
+    padding: 3px;
+    border-radius: 34px;
+    background-color: white;
+}
+
+#account-image {
+    display: block;
+    width: 48px;
+    height: 48px;
+    border-radius: 32px;
+}
+
+#ribbon {
+    position: absolute;
+    top: 32px;
+    right: 0;
+    display: none;
+    width: 24px;
+}
+
+.ribbon-small {
+    display: inline-block;
+    width: 14px;
+    margin-left: 6px;
+    vertical-align: top;
+}
+
+#options #access-token-option {
+    margin: 0 0 28px;
+    padding: 16px 20px;
+}
+
+#options #access-token-option h2 {
+    margin: 0 0 8px;
+    font-size: 17px;
+}
+
+#options #access-token-option p {
+    margin: 6px 0;
+}
+
+#options #access-token-option .token-auth-input {
+    width: min(100%, 520px);
+    padding: 7px 8px;
+}
+
+#options #access-token-option .token-auth-button {
+    height: 28px;
+    min-width: 0;
+    padding: 0 5px;
+    margin-left: 10px;
+}
+
+#options #access-token-option .token-auth-status {
+    margin-left: 8px;
+}

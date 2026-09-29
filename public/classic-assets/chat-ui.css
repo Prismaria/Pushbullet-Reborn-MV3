@@ -56,30 +56,63 @@
     font-size: 11px;
     color: #5c6868;
 }
+.push-full-history {
+    margin: 10px;
+    text-align: center;
+}
+.push-full-history a {
+    cursor: pointer;
+}
+.push-history-status,
+.push-history-retry {
+    display: block;
+    margin: 8px auto;
+    color: #5c6868;
+    font-size: 11px;
+    text-align: center;
+}
+.push-history-retry {
+    padding: 4px 8px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
 .chat-row {
     position: relative;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
     margin: 5px 10px;
     overflow: hidden;
     min-height: 30px;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.chat-row.incoming {
+    justify-content: flex-start;
 }
 .chat-row.queued {
     opacity: 0.5;
 }
 .chat-bubble {
-    float: right;
+    flex: 0 1 auto;
+    width: fit-content;
     border-radius: 2px;
     background-color: #ecf0f0;
     margin-right: 40px;
     margin-left: 14px;
     overflow: hidden;
     min-height: 30px;
+    min-width: 0;
+    max-width: calc(100% - 72px);
+    box-sizing: border-box;
 }
 .chat-bubble.left {
-    float: left;
     color: white;
     background-color: #7c94a1;
     margin-right: 14px;
     margin-left: 40px;
+    max-width: calc(100% - 72px);
 }
 .chat-bubble.left.sms {
     background-color: #579697;
@@ -89,6 +122,9 @@
 }
 .chat-bubble-contents {
     margin: 6px 8px;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
 .chat-thumbnail {
     position: absolute;
@@ -127,20 +163,32 @@
 .chat-title {
     font-weight: bold;
     word-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 .chat-body {
     word-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 .chat-url {
     display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.chat-url.left {
+    color: white;
 }
 .chat-image {
     display: block;
     cursor: pointer;
     margin-bottom: 6px;
+    max-width: 192px;
+    max-height: 192px;
+    object-fit: contain;
+}
+#push-link-holder {
+    background-color: white;
 }
 .chat-progress-bar {
     height: 14px;
@@ -149,6 +197,12 @@
 .chat-progress-bar-fill {
     height: 100%;
     background-color: #5c6868;
+}
+.classic-upload-progress .chat-bubble {
+    min-width: 180px;
+}
+.classic-upload-progress .chat-progress-bar {
+    margin-top: 8px;
 }
 .chat-date {
     font-size: 11px;

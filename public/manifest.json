@@ -22,5 +22,5 @@
     "instant-push-current-tab": { "description": "Instantly push the current tab" },
     "pop-out-panel": { "description": "Open Pushbullet in a separate window" }
   },
-  "host_permissions": ["https://api.pushbullet.com/*", "https://upload.pushbullet.com/*"]
+  "host_permissions": ["https://api.pushbullet.com/*", "https://upload.pushbullet.com/*", "https://*.upload.pushbullet.com/*", "https://upload2.pushbullet.com/*"]
 }

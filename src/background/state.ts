@@ -4,7 +4,8 @@ import {
   type Device,
   type EntityMap,
   type ExtensionSettings,
-  type ExtensionState
+  type ExtensionState,
+  type Push
 } from '../shared/models.ts'
 import { toExtensionUser } from '../shared/messages.ts'
 
@@ -63,6 +64,37 @@ function normalizeDeviceMap(value: unknown): EntityMap<Device> {
   }))
 }
 
+function normalizePushMap(value: unknown): EntityMap<Push> {
+  return Object.fromEntries(Object.entries(parseMap<unknown>(value)).flatMap(([key, item]) => {
+    const raw = parseRecord(item)
+    const iden = typeof raw.iden === 'string' ? raw.iden : key
+    if (!iden) return []
+    return [[iden, {
+      ...raw,
+      iden,
+      fileName: typeof raw.fileName === 'string' ? raw.fileName : typeof raw.file_name === 'string' ? raw.file_name : undefined,
+      fileType: typeof raw.fileType === 'string' ? raw.fileType : typeof raw.file_type === 'string' ? raw.file_type : undefined,
+      fileUrl: typeof raw.fileUrl === 'string' ? raw.fileUrl : typeof raw.file_url === 'string' ? raw.file_url : undefined,
+      email: typeof raw.email === 'string' ? raw.email : undefined,
+      imageUrl: typeof raw.imageUrl === 'string' ? raw.imageUrl : typeof raw.image_url === 'string' ? raw.image_url : undefined,
+      imageWidth: typeof raw.imageWidth === 'number' ? raw.imageWidth : typeof raw.image_width === 'number' ? raw.image_width : undefined,
+      imageHeight: typeof raw.imageHeight === 'number' ? raw.imageHeight : typeof raw.image_height === 'number' ? raw.image_height : undefined,
+      direction: typeof raw.direction === 'string' ? raw.direction : undefined,
+      senderEmailNormalized: typeof raw.senderEmailNormalized === 'string' ? raw.senderEmailNormalized : typeof raw.sender_email_normalized === 'string' ? raw.sender_email_normalized : undefined,
+      receiverEmailNormalized: typeof raw.receiverEmailNormalized === 'string' ? raw.receiverEmailNormalized : typeof raw.receiver_email_normalized === 'string' ? raw.receiver_email_normalized : undefined,
+      sourceDeviceIden: typeof raw.sourceDeviceIden === 'string' ? raw.sourceDeviceIden : typeof raw.source_device_iden === 'string' ? raw.source_device_iden : undefined,
+      targetDeviceIden: typeof raw.targetDeviceIden === 'string' ? raw.targetDeviceIden : typeof raw.target_device_iden === 'string' ? raw.target_device_iden : undefined,
+      deviceIden: typeof raw.deviceIden === 'string' ? raw.deviceIden : typeof raw.device_iden === 'string' ? raw.device_iden : undefined,
+      streamDeviceIden: typeof raw.streamDeviceIden === 'string' ? raw.streamDeviceIden : typeof raw.stream_device_iden === 'string' ? raw.stream_device_iden : undefined,
+      channelIden: typeof raw.channelIden === 'string' ? raw.channelIden : typeof raw.channel_iden === 'string' ? raw.channel_iden : undefined,
+      clientIden: typeof raw.clientIden === 'string' ? raw.clientIden : typeof raw.client_iden === 'string' ? raw.client_iden : undefined,
+      channelTag: typeof raw.channelTag === 'string' ? raw.channelTag : typeof raw.channel_tag === 'string' ? raw.channel_tag : undefined,
+      created: typeof raw.created === 'number' ? raw.created : undefined,
+      modified: typeof raw.modified === 'number' ? raw.modified : undefined
+    } as Push]]
+  }))
+}
+
 function normalizeState(value: unknown): ExtensionState {
   const saved = parseRecord(value) as Partial<ExtensionState>
   const state = createDefaultState()
@@ -76,9 +108,11 @@ function normalizeState(value: unknown): ExtensionState {
     subscriptions: parseMap(saved.subscriptions),
     channels: parseMap(saved.channels),
     grants: parseRecord(saved.grants),
-    pushes: parseMap(saved.pushes),
+    pushes: normalizePushMap(saved.pushes),
     texts: parseRecord(saved.texts),
     notifications: parseMap(saved.notifications),
+    pushHistoryCursor: typeof saved.pushHistoryCursor === 'string' ? saved.pushHistoryCursor : null,
+    pushHistoryLoadedPages: typeof saved.pushHistoryLoadedPages === 'number' ? saved.pushHistoryLoadedPages : 0,
     settings: {
       ...DEFAULT_SETTINGS,
       ...parseRecord(saved.settings) as Partial<ExtensionSettings>
@@ -109,9 +143,11 @@ function migrateLegacyState(stored: Record<string, unknown>): ExtensionState {
     subscriptions: parseMap(stored.subscriptions),
     channels: parseMap(stored.channels),
     grants: parseRecord(stored.grants),
-    pushes: parseMap(stored.pushes),
+    pushes: normalizePushMap(stored.pushes),
     texts: parseRecord(stored.texts),
     notifications: parseMap(stored.notifications),
+    pushHistoryCursor: null,
+    pushHistoryLoadedPages: 0,
     connectionStatus: stored.connectionStatus === 'connected' || stored.connectionStatus === 'connecting' ? stored.connectionStatus : 'disconnected',
     awake: stored.awake === true,
     lastModified: Number(stored.lastModified) || 0,

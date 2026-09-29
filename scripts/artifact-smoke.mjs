@@ -24,7 +24,7 @@ export async function validateArtifactDirectory(outputPath, artifactPipeline = p
   else assert.equal(manifest.version_name, undefined)
   assert.ok(manifest.permissions.includes('activeTab'))
   assert.ok(manifest.permissions.includes('tabs'))
-  assert.deepEqual(manifest.host_permissions, ['https://api.pushbullet.com/*', 'https://upload.pushbullet.com/*'])
+  assert.deepEqual(manifest.host_permissions, ['https://api.pushbullet.com/*', 'https://upload.pushbullet.com/*', 'https://*.upload.pushbullet.com/*', 'https://upload2.pushbullet.com/*'])
   assert.deepEqual(manifest.optional_permissions, ['contextMenus'])
 
   const entryFiles = classic

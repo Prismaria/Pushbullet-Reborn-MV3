@@ -58,6 +58,10 @@ export type Push = {
   fileName?: string
   fileType?: string
   fileUrl?: string
+  email?: string
+  imageUrl?: string
+  imageWidth?: number
+  imageHeight?: number
   direction?: 'self' | 'incoming' | 'outgoing' | string
   senderEmailNormalized?: string
   receiverEmailNormalized?: string
@@ -183,6 +187,8 @@ export type ExtensionState = {
   pushes: EntityMap<Push>
   texts: Record<string, unknown>
   notifications: EntityMap<NotificationRecord>
+  pushHistoryCursor: string | null
+  pushHistoryLoadedPages: number
   awake: boolean
   lastModified: number
   settings: ExtensionSettings
@@ -222,6 +228,8 @@ export function createDefaultState(): ExtensionState {
     pushes: {},
     texts: {},
     notifications: {},
+    pushHistoryCursor: null,
+    pushHistoryLoadedPages: 0,
     awake: false,
     lastModified: 0,
     settings: { ...DEFAULT_SETTINGS }

@@ -7,9 +7,10 @@ import { mirrorIdentity, type Chat, type Device, type EntityMap, type ExtensionS
 type DeviceResponse = { devices?: unknown[] }
 type ChatResponse = { chats?: unknown[] }
 type SubscriptionResponse = { subscriptions?: unknown[] }
-type PushResponse = { pushes?: unknown[] }
+type PushResponse = { pushes?: unknown[]; cursor?: unknown }
 
 let refreshPromise: Promise<ExtensionState> | null = null
+let historyPagePromise: Promise<ExtensionState> | null = null
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {}
@@ -70,6 +71,10 @@ export function normalizePush(value: unknown): Push | null {
     fileName: stringValue(raw.file_name),
     fileType: stringValue(raw.file_type),
     fileUrl: stringValue(raw.file_url),
+    email: stringValue(raw.email),
+    imageUrl: stringValue(raw.image_url),
+    imageWidth: typeof raw.image_width === 'number' ? raw.image_width : undefined,
+    imageHeight: typeof raw.image_height === 'number' ? raw.image_height : undefined,
     direction: stringValue(raw.direction),
     senderEmailNormalized: stringValue(raw.sender_email_normalized),
     receiverEmailNormalized: stringValue(raw.receiver_email_normalized),
@@ -190,8 +195,7 @@ export async function refreshRemoteState(options: { notify?: boolean } = {}): Pr
       const channel = subscription.channel
       return channel?.iden ? [[channel.iden, channel]] : []
     }))
-    const pushes = pushesResponse ? mapById(pushesResponse.pushes || [], normalizePush) : current.pushes
-    const lastModified = Math.max(current.lastModified, ...Object.values(pushes).map((push) => push.modified || 0))
+    const fetchedPushes = pushesResponse ? mapById(pushesResponse.pushes || [], normalizePush) : null
     const next = await updateState((state) => ({
       ...state,
       user: {
@@ -208,13 +212,21 @@ export async function refreshRemoteState(options: { notify?: boolean } = {}): Pr
       chats,
       subscriptions,
       channels,
-      pushes,
-      lastModified,
+      pushes: fetchedPushes
+        ? (state.pushHistoryLoadedPages || 0) > 1 ? { ...state.pushes, ...fetchedPushes } : fetchedPushes
+        : state.pushes,
+      pushHistoryCursor: pushesResponse
+        ? (state.pushHistoryLoadedPages || 0) > 1
+          ? state.pushHistoryCursor
+          : typeof pushesResponse.cursor === 'string' ? pushesResponse.cursor : null
+        : state.pushHistoryCursor,
+      pushHistoryLoadedPages: pushesResponse && (state.pushHistoryLoadedPages || 0) === 0 ? 1 : state.pushHistoryLoadedPages,
+      lastModified: Math.max(state.lastModified, ...Object.values(fetchedPushes ? { ...state.pushes, ...fetchedPushes } : state.pushes).map((push) => push.modified || 0)),
       connectionStatus: 'connected'
     }))
     await broadcastState(next)
     if (options.notify) {
-      const newPushes = Object.values(pushes).filter((push) => !current.pushes[push.iden])
+      const newPushes = Object.values(next.pushes).filter((push) => !current.pushes[push.iden])
       await notifyForPushes(newPushes)
     }
     return next
@@ -222,4 +234,31 @@ export async function refreshRemoteState(options: { notify?: boolean } = {}): Pr
     refreshPromise = null
   })
   return refreshPromise
+}
+
+export async function loadMorePushHistory(): Promise<ExtensionState> {
+  if (historyPagePromise) return historyPagePromise
+  historyPagePromise = (async () => {
+    const current = await readState()
+    const cursor = current.pushHistoryCursor
+    if (!cursor) return current
+
+    const response = await apiRequest<PushResponse>(`/v2/pushes?active=true&limit=100&cursor=${encodeURIComponent(cursor)}`)
+    const latestState = await readState()
+    if (latestState.pushHistoryCursor !== cursor) return latestState
+
+    const page = mapById(response.pushes || [], normalizePush)
+    const nextCursor = typeof response.cursor === 'string' && response.cursor !== cursor ? response.cursor : null
+    const nextState = await updateState((state) => ({
+      ...state,
+      pushes: { ...state.pushes, ...page },
+      pushHistoryCursor: nextCursor,
+      pushHistoryLoadedPages: state.pushHistoryLoadedPages + 1
+    }))
+    await broadcastState(nextState)
+    return nextState
+  })().finally(() => {
+    historyPagePromise = null
+  })
+  return historyPagePromise
 }

@@ -153,9 +153,14 @@ Status: in progress
 - [x] Copy the active legacy CSS and visual assets into the Classic artifact.
 - [x] Preserve legacy DOM IDs/classes for panel, notifications, account, authentication, chat, SMS, and options surfaces.
 - [x] Add Classic pop-out routing, tab/target persistence, welcome/privacy approval, friend/channel action rows, and SMS new-thread/phonebook flows.
+- [x] Restore latest-push stream summaries and activity ordering, wrapped links, image previews, time dividers, sender avatars, and bottom-anchored history scrolling.
+- [x] Load Pushbullet history cursor pages as the user scrolls up, and keep the website fallback link in the current panel window.
+- [x] Skip automatic link attachment on non-web tabs without surfacing a composer error.
 - [ ] Match all legacy SMS pending/retry/MMS states and periodic refresh behavior.
 - [ ] Match mirrored notification images, mute/reply/Android actions, and source-device behavior.
 - [ ] Complete an unpacked visual and interaction comparison against `366_0`.
+
+Screenshot-driven Classic panel fixes and their validation scope are recorded in `CLASSIC_PARITY_FIXES.md`.
 
 Acceptance: `dist-classic/` loads as an independent MV3 extension, shares only the approved backend contracts, and matches the active legacy frontend behavior and visual structure across all shipped pages.
 

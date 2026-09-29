@@ -14,7 +14,7 @@ Subscriptions and channel targets are read and persisted. Channel moderation con
 
 ## Permissions
 
-- Static host access is limited to `api.pushbullet.com` and `upload.pushbullet.com`.
+- Static host access is limited to `api.pushbullet.com` and Pushbullet's signed upload endpoints (`upload.pushbullet.com`, its upload subdomains, and `upload2.pushbullet.com`).
 - `activeTab` is used only for an explicit active-tab attachment or command.
 - `tabs` is used only to read the active tab URL and title for explicit push actions.
 - `contextMenus` is optional and requested from the options page after a user gesture.

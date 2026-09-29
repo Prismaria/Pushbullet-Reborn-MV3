@@ -101,6 +101,12 @@ body.popout {
     display: block;
     font-size: 22px;
 }
+.account-tab-icon {
+    width: 22px;
+    height: 22px;
+    margin: 0 auto;
+    fill: currentColor;
+}
 .tab:hover {
     cursor: pointer;
 }

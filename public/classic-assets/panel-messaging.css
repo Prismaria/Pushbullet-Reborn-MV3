@@ -25,6 +25,9 @@
 }
 .stream-row-content .secondary {
     color: #95a5a6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .stream-row .pop-out-stream {
     position: absolute;

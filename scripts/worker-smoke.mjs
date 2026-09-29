@@ -132,7 +132,12 @@ globalThis.fetch = async (url, init = {}) => {
   if (parsed.pathname === '/v2/devices' && method === 'POST') return jsonResponse({ iden: 'chrome-1', nickname: 'Chrome', type: 'chrome', active: true })
   if (parsed.pathname === '/v2/chats') return jsonResponse({ chats: [{ iden: 'chat-1', active: true, with: { email: 'friend@example.com', email_normalized: 'friend@example.com', name: 'Friend' } }] })
   if (parsed.pathname === '/v2/subscriptions') return jsonResponse({ subscriptions: [{ iden: 'subscription-1', active: true, channel: { iden: 'channel-1', tag: 'updates', name: 'Updates' } }] })
-  if (parsed.pathname === '/v2/pushes' && method === 'GET') return jsonResponse({ pushes: [] })
+  if (parsed.pathname === '/v2/pushes' && method === 'GET') {
+    const cursor = parsed.searchParams.get('cursor')
+    if (cursor === 'older-page-1') return jsonResponse({ pushes: [{ iden: 'older-push-1', direction: 'self', created: 10, body: 'Earlier push' }], cursor: 'older-page-2' })
+    if (cursor === 'older-page-2') return jsonResponse({ pushes: [{ iden: 'older-push-2', direction: 'self', created: 5, body: 'Oldest push' }] })
+    return jsonResponse({ pushes: [], cursor: 'older-page-1' })
+  }
   if (parsed.pathname === '/v2/pushes' && method === 'POST') {
     return jsonResponse({ iden: `push-${pushNumber++}`, ...body, created: 100, modified: 100, target_device_iden: body.device_iden })
   }
@@ -233,7 +238,7 @@ class MockPort {
 const uploadPort = new MockPort()
 connectListener(uploadPort)
 uploadPort.sendFromClient({ type: 'start', fileName: 'smoke.bin', mimeType: 'application/octet-stream', size: 4, target: { deviceIden: 'phone-1' } })
-uploadPort.sendFromClient({ type: 'chunk', buffer: Uint8Array.from([1, 2, 3, 4]).buffer })
+uploadPort.sendFromClient({ type: 'chunk', data: 'AQIDBA==', size: 4 })
 uploadPort.sendFromClient({ type: 'complete' })
 await new Promise((resolve) => setTimeout(resolve, 10))
 if (!uploadPort.outbound.some((message) => message.type === 'complete')) throw new Error('File upload smoke test failed.')
@@ -242,7 +247,7 @@ if (!fetchCalls.some((call) => call.path === '/v2/upload-request' && call.method
 const smsUploadPort = new MockPort()
 connectListener(smsUploadPort)
 smsUploadPort.sendFromClient({ type: 'start', fileName: 'mms.bin', mimeType: 'application/octet-stream', size: 2, delivery: 'sms', target: {}, sms: { deviceIden: 'phone-1', addresses: ['+15550001'], body: 'MMS' } })
-smsUploadPort.sendFromClient({ type: 'chunk', buffer: Uint8Array.from([5, 6]).buffer })
+smsUploadPort.sendFromClient({ type: 'chunk', data: 'BQY=', size: 2 })
 smsUploadPort.sendFromClient({ type: 'complete' })
 await new Promise((resolve) => setTimeout(resolve, 10))
 if (!smsUploadPort.outbound.some((message) => message.type === 'complete' && message.sms)) throw new Error('SMS attachment upload smoke test failed.')
@@ -252,6 +257,14 @@ if (!note.ok || Object.keys(note.state.pushes).length !== 2) throw new Error('No
 
 const link = await dispatch({ type: 'send_push', push: { type: 'link', title: 'Example', url: 'https://example.com', deviceIden: 'phone-1' } })
 if (!link.ok || Object.keys(link.state.pushes).length !== 3) throw new Error('Link push smoke test failed.')
+
+const olderPageOne = await dispatch({ type: 'load_more_push_history' })
+if (!olderPageOne.ok || olderPageOne.state.pushes['older-push-1']?.body !== 'Earlier push' || olderPageOne.state.pushHistoryCursor !== 'older-page-2') throw new Error('First push history page smoke test failed.')
+const olderPageTwo = await dispatch({ type: 'load_more_push_history' })
+if (!olderPageTwo.ok || olderPageTwo.state.pushes['older-push-2']?.body !== 'Oldest push' || olderPageTwo.state.pushHistoryCursor !== null) throw new Error('Final push history page smoke test failed.')
+const historyRequestCount = fetchCalls.filter((call) => call.path.startsWith('/v2/pushes?active=true&limit=100&cursor=')).length
+await dispatch({ type: 'load_more_push_history' })
+if (fetchCalls.filter((call) => call.path.startsWith('/v2/pushes?active=true&limit=100&cursor=')).length !== historyRequestCount) throw new Error('Exhausted push history made an extra API request.')
 
 const originalConsoleError = console.error
 console.error = () => undefined

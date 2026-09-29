@@ -55,12 +55,13 @@ The Reborn and Classic ZIPs are separate extensions. Load only the variant you w
 - `src/options/` owns the settings page.
 - `src/classic/` owns the component-based Classic pages; `classic-pages/` contains their HTML entries and `public/classic-assets/` contains the legacy visual assets.
 - `public/manifest.json` is the base manifest; the Classic build patches its name and page routes after Vite emits the bundle.
+- `CLASSIC_PARITY_FIXES.md` records screenshot-driven Classic panel parity fixes and remaining manual comparison work.
 
 ## Permissions
 
 - `storage`, `alarms`, `idle`, `notifications`, `offscreen`, `activeTab`, and `tabs` are required by the migrated worker and UI. `tabs` is used only to read the active tab URL/title for explicit push actions.
 - `https://api.pushbullet.com/*` is used for authenticated API calls.
-- `https://upload.pushbullet.com/*` is used only for signed file-upload destinations returned by Pushbullet.
+- Pushbullet signed file-upload URLs may use `upload.pushbullet.com`, its upload subdomains, or `upload2.pushbullet.com`.
 - `contextMenus` is optional and is requested only when enabled from Settings.
 
 Access tokens are validated and stored by the worker. UI code never calls Pushbullet directly. See `ADVANCED_FEATURES.md` for encryption, mirror, channel, and permission decisions.
