@@ -6,7 +6,7 @@ The active legacy entry point loads `pb-sw.js`, `utils.js`, and `backend-sw.js`.
 
 ## Mirrors
 
-The active worker behavior supports mirrored notifications, safe HTTP(S) link opening, dismissal, and persisted action IDs. Quick reply, Android action dispatch, and app muting are not ported because they only exist in inactive legacy modules or require a separate protocol contract.
+The active worker behavior supports mirrored notifications, validated app icons/images, safe HTTP(S) link opening, dismissal, and app mute/unmute through the Pushbullet ephemeral protocol. Clear-all remotely dismisses mirrored device notifications by default; this can be disabled in notification settings. Quick reply and Android action dispatch remain deferred because they require additional UI and action-dispatch contracts.
 
 ## Channels
 
@@ -14,11 +14,11 @@ Subscriptions and channel targets are read and persisted. Channel moderation con
 
 ## Permissions
 
-- Static host access is limited to `api.pushbullet.com` and Pushbullet's signed upload endpoints (`upload.pushbullet.com`, its upload subdomains, and `upload2.pushbullet.com`).
+- Static host access is limited to `api.pushbullet.com`, Pushbullet's signed upload endpoints (`upload.pushbullet.com`, its upload subdomains, and `upload2.pushbullet.com`), and `www.pushbullet.com` for the upload credential cookie.
 - `activeTab` is used only for an explicit active-tab attachment or command.
 - `tabs` is used only to read the active tab URL and title for explicit push actions.
 - `contextMenus` is optional and requested from the options page after a user gesture.
-- No broad page host access, cookies, tabs, or native messaging permission is requested.
+- Both builds read only the Pushbullet `api_key` cookie when starting or finishing a chunked file upload; they verify the cookie belongs to the configured account and do not persist it. Neither build requests broad page host access or native messaging.
 
 ## Privacy
 

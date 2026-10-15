@@ -1,7 +1,21 @@
-import type { PushDraft, SmsSendDraft } from './models'
+import type { ExtensionUser, PushDraft, SmsSendDraft } from './models'
 
-export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+export const DEFAULT_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024
+export const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024
+export const MAX_SINGLE_POST_UPLOAD_BYTES = DEFAULT_UPLOAD_LIMIT_BYTES
 export const UPLOAD_CHUNK_BYTES = 256 * 1024
+
+export function maxUploadBytesForUser(user: ExtensionUser): number {
+  const accountLimit = user?.maxUploadSize
+  if (!Number.isSafeInteger(accountLimit) || !accountLimit || accountLimit < 1) return DEFAULT_UPLOAD_LIMIT_BYTES
+  return Math.min(accountLimit, MAX_UPLOAD_BYTES)
+}
+
+export function formatUploadLimit(maxUploadBytes: number): string {
+  const bytesPerGb = 1024 * 1024 * 1024
+  if (maxUploadBytes % bytesPerGb === 0) return `${maxUploadBytes / bytesPerGb} GB`
+  return `${Math.ceil(maxUploadBytes / (1024 * 1024))} MB`
+}
 
 export type UploadStart = {
   type: 'start'

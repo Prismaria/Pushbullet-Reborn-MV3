@@ -1,13 +1,17 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { sendExtensionMessage } from '../shared/messages'
-import type { Chat, Device, ExtensionState, Push, Subscription } from '../shared/models'
+import { LargeUploadAuthNotice } from '../shared/LargeUploadAuthNotice'
+import { mirrorIconDataUrl, mirrorImageDataUrl } from '../shared/mirror-images'
+import { notificationActionIcon } from '../shared/notification-actions'
+import type { Chat, Device, ExtensionState, NotificationRecord, Push, Subscription } from '../shared/models'
 import { uploadFileThroughPort } from '../shared/uploadClient'
-import { MAX_UPLOAD_BYTES } from '../shared/uploads'
+import { formatUploadLimit, maxUploadBytesForUser } from '../shared/uploads'
 import { validateHttpUrl } from '../shared/validation'
 import { ClassicAuth } from './ClassicAuth'
 import { ClassicUploadProgressBubble, type ClassicUploadProgress } from './ClassicUploadProgressBubble'
-import { latestPushForTarget, pushGroupKey, pushMatchesTarget, pushPreview, pushTimestamp, sortTargetsByLatestPush, type ClassicPushTarget } from './push-utils'
+import { groupDuplicateDevicePushes, latestPushForTarget, pushGroupKey, pushMatchesTarget, pushPreview, pushTimestamp, sortTargetsByLatestPush, type ClassicPushTarget } from './push-utils'
 import { useClassicState } from './useClassicState'
+import { cachePanelState, INITIAL_HISTORY_GROUPS, PANEL_PREFERENCES_CACHE_KEY, readPanelPreferences } from './startup-cache'
 
 type MainTab = 'pushing' | 'sms' | 'notifications' | 'account'
 type PushTab = 'friends' | 'me' | 'following'
@@ -50,22 +54,26 @@ function classicTargets(state: ExtensionState, tab: PushTab): ClassicTarget[] {
       }))
     ]
   }
-  const withPreviews = targets.map((target) => ({ ...target, secondary: pushPreview(latestPushForTarget(state.pushes, target)) }))
-  return sortTargetsByLatestPush(withPreviews, state.pushes)
+  const withPreviews = targets.map((target) => ({ ...target, secondary: pushPreview(latestPushForTarget(state.pushes, target, state.settings.showSentPushesInDeviceHistory)) }))
+  return sortTargetsByLatestPush(withPreviews, state.pushes, state.settings.showSentPushesInDeviceHistory)
 }
+
+const timeFormatter = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+const recentDateFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+const fullDateFormatter = new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+const shortDateFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+const ageFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 
 function formatPushTimeDivider(timestamp: number): string {
   const date = new Date(timestamp || Date.now())
-  const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date)
+  const time = timeFormatter.format(date)
   const today = new Date()
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
   const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
   const daysAgo = Math.round((todayStart - dateStart) / 86_400_000)
   if (daysAgo === 0) return `Today at ${time}`
   if (daysAgo === 1) return `Yesterday at ${time}`
-  const dateLabel = new Intl.DateTimeFormat(undefined, daysAgo < 7
-    ? { weekday: 'long', month: 'long', day: 'numeric' }
-    : { month: 'long', day: 'numeric', year: 'numeric' }).format(date)
+  const dateLabel = (daysAgo < 7 ? recentDateFormatter : fullDateFormatter).format(date)
   return `${dateLabel} at ${time}`
 }
 
@@ -75,13 +83,13 @@ function formatLastPushAge(timestamp: number): string {
   if (elapsed < 5 * 60_000) return 'now'
   if (elapsed < 24 * 60 * 60_000) {
     const hours = Math.max(1, Math.round(elapsed / 3_600_000))
-    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(-hours, 'hour')
+    return ageFormatter.format(-hours, 'hour')
   }
   if (elapsed < 7 * 24 * 60 * 60_000) {
     const days = Math.max(1, Math.round(elapsed / 86_400_000))
-    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(-days, 'day')
+    return ageFormatter.format(-days, 'day')
   }
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(timestamp)
+  return shortDateFormatter.format(timestamp)
 }
 
 function pushIsOnLeft(push: Push, state: ExtensionState): boolean {
@@ -156,10 +164,10 @@ function localSmsMessages(state: ExtensionState, deviceIden: string, addresses: 
   })
 }
 
-function ClassicStreamRow({ target, selected, onSelect, onPopout }: { target: ClassicTarget; selected: boolean; onSelect: () => void; onPopout: () => void }) {
+function ClassicStreamRow({ target, selected, onSelect, onPopout, showDeviceId, onDeviceContextMenu }: { target: ClassicTarget; selected: boolean; onSelect: () => void; onPopout: () => void; showDeviceId: boolean; onDeviceContextMenu?: (event: MouseEvent<HTMLDivElement>) => void }) {
   return (
-    <div className={`stream-row${selected ? ' selected' : ''}`} onClick={onSelect} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') onSelect() }}>
-      <img className="stream-row-image" src={target.image} alt="" onError={(event) => { event.currentTarget.src = asset('chip_other.png') }} />
+    <div className={`stream-row${selected ? ' selected' : ''}`} onClick={onSelect} onContextMenu={onDeviceContextMenu} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') onSelect() }}>
+      <img className="stream-row-image" src={target.image} alt="" title={showDeviceId ? target.deviceIden : undefined} onError={(event) => { event.currentTarget.src = asset('chip_other.png') }} />
       <div className="stream-row-content">
         <div>{target.label}</div>
         {target.secondary && <div className="secondary">{target.secondary}</div>}
@@ -174,9 +182,23 @@ function ClassicActionRow({ image, label, onClick }: { image: string; label: str
 }
 
 function ClassicPushHistory({ state, target, linkOpen, uploadProgress }: { state: ExtensionState; target: ClassicTarget | null; linkOpen: boolean; uploadProgress: ClassicUploadProgress | null }) {
-  const pushes = Object.values(state.pushes)
-    .filter((push) => pushMatchesTarget(push, target))
-    .sort((first, second) => pushTimestamp(first) - pushTimestamp(second))
+  const pushes = useMemo(() => Object.values(state.pushes)
+    .filter((push) => pushMatchesTarget(push, target, state.settings.showSentPushesInDeviceHistory))
+    .sort((first, second) => pushTimestamp(first) - pushTimestamp(second) || first.iden.localeCompare(second.iden)), [
+      state.pushes,
+      state.settings.showSentPushesInDeviceHistory,
+      target?.id,
+      target?.deviceIden,
+      target?.email,
+      target?.channelIden,
+      target?.channelTag
+    ])
+  const displayGroups = useMemo(() => target?.id === 'everything'
+    ? groupDuplicateDevicePushes(pushes)
+    : pushes.map((push) => ({ push, destinationDeviceIdens: [] as string[] })), [pushes, target?.id])
+  const [visibleCount, setVisibleCount] = useState(INITIAL_HISTORY_GROUPS)
+  const showAllCachedRef = useRef(false)
+  const visibleGroups = showAllCachedRef.current ? displayGroups : displayGroups.slice(-visibleCount)
   const scrollRef = useRef<HTMLDivElement>(null)
   const keepAtBottomRef = useRef(true)
   const previousTargetIdRef = useRef<string | null>(null)
@@ -184,10 +206,16 @@ function ClassicPushHistory({ state, target, linkOpen, uploadProgress }: { state
   const olderPageAnchorRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [loadOlderError, setLoadOlderError] = useState('')
-  const historyKey = `${state.pushHistoryLoadedPages}|${uploadProgress?.fileName || ''}:${uploadProgress?.progress ?? ''}|${pushes.map((push) => [push.iden, pushTimestamp(push), push.title, push.body, push.url, push.fileUrl, push.imageUrl].join(':')).join('|')}`
-
   const loadOlderPushes = async () => {
-    if (!state.pushHistoryCursor || loadingOlderRef.current) return
+    if (loadingOlderRef.current) return
+    if (!showAllCachedRef.current && visibleCount < displayGroups.length) {
+      const element = scrollRef.current
+      olderPageAnchorRef.current = element ? { scrollTop: element.scrollTop, scrollHeight: element.scrollHeight } : null
+      setVisibleCount((count) => count + INITIAL_HISTORY_GROUPS)
+      return
+    }
+    if (!state.pushHistoryCursor) return
+    showAllCachedRef.current = true
     loadingOlderRef.current = true
     const scrollElement = scrollRef.current
     olderPageAnchorRef.current = scrollElement
@@ -237,7 +265,7 @@ function ClassicPushHistory({ state, target, linkOpen, uploadProgress }: { state
       keepAtBottomRef.current = true
       scheduleScrollToBottom()
     }
-  }, [historyKey, target?.id])
+  }, [pushes, visibleCount, state.pushHistoryLoadedPages, uploadProgress?.fileName, uploadProgress?.progress, target?.id])
 
   useEffect(() => {
     const element = scrollRef.current
@@ -264,15 +292,19 @@ function ClassicPushHistory({ state, target, linkOpen, uploadProgress }: { state
       {target && <div className="push-full-history"><a href={fullHistoryUrl(target)} target="_self">See full history</a></div>}
       {loadingOlder && <div className="push-history-status" role="status">Loading earlier pushes…</div>}
       {loadOlderError && <button className="push-history-retry" type="button" onClick={() => void loadOlderPushes()}>Could not load earlier pushes. Retry</button>}
-      {pushes.length === 0 && <div id="chat-empty-state"><div><img src={asset('bg_sam.png')} alt="" /><p>No pushes yet.</p></div></div>}
-      {pushes.map((push, index) => {
+      {displayGroups.length === 0 && <div id="chat-empty-state"><div><img src={asset('bg_sam.png')} alt="" /><p>No pushes yet.</p></div></div>}
+      {visibleGroups.map((group, index) => {
+        const push = group.push
         const incoming = pushIsOnLeft(push, state)
-        const previous = pushes[index - 1]
-        const next = pushes[index + 1]
+        const previous = visibleGroups[index - 1]?.push
+        const next = visibleGroups[index + 1]?.push
         const timestamp = pushTimestamp(push)
-        const imageUrl = push.imageUrl || push.mirror?.image || (push.fileType?.startsWith('image/') ? push.fileUrl : undefined)
+        const imageUrl = push.imageUrl || mirrorImageDataUrl(push.mirror?.image) || (push.fileType?.startsWith('image/') ? push.fileUrl : undefined)
+        const imageHref = validateHttpUrl(push.fileUrl || '') || validateHttpUrl(imageUrl || '')
         const showAvatar = !next || pushGroupKey(next) !== pushGroupKey(push)
         const avatar = pushAvatar(state, push)
+        const destinationLabels = group.destinationDeviceIdens.map((iden) => state.devices[iden]?.nickname || state.devices[iden]?.model || iden)
+        const destinationTitles = group.destinationDeviceIdens.map((iden) => `${state.devices[iden]?.nickname || state.devices[iden]?.model || iden} (${iden})`)
         const imageScale = push.imageWidth && push.imageHeight ? Math.min(1, 192 / push.imageWidth, 192 / push.imageHeight) : 1
         const imageStyle = push.imageWidth && push.imageHeight
           ? { width: `${Math.round(push.imageWidth * imageScale)}px`, height: `${Math.round(push.imageHeight * imageScale)}px` }
@@ -284,9 +316,12 @@ function ClassicPushHistory({ state, target, linkOpen, uploadProgress }: { state
               <div className="chat-bubble-contents">
                 {push.title && <div className="chat-title">{push.title}</div>}
                 {push.body && <div className="chat-body">{linkifyBody(push.body)}</div>}
-                {imageUrl && <img className="chat-image" src={imageUrl} alt={push.title || push.fileName || 'Push attachment'} style={imageStyle} onLoad={() => { if (keepAtBottomRef.current) scrollToBottom() }} onError={(event) => { event.currentTarget.style.display = 'none' }} />}
+                {imageUrl && (imageHref
+                  ? <a href={imageHref} target="_blank" rel="noreferrer"><img className="chat-image" src={imageUrl} alt={push.title || push.fileName || 'Push attachment'} style={imageStyle} onLoad={() => { if (keepAtBottomRef.current) scrollToBottom() }} onError={(event) => { event.currentTarget.style.display = 'none' }} /></a>
+                  : <img className="chat-image" src={imageUrl} alt={push.title || push.fileName || 'Push attachment'} style={imageStyle} onLoad={() => { if (keepAtBottomRef.current) scrollToBottom() }} onError={(event) => { event.currentTarget.style.display = 'none' }} />)}
                 {!imageUrl && push.url && <a className={`chat-url${incoming ? ' left' : ''}`} href={push.url} target="_blank" rel="noreferrer">{push.url}</a>}
                 {!imageUrl && !push.url && push.fileUrl && <a className={`chat-url${incoming ? ' left' : ''}`} href={push.fileUrl} target="_blank" rel="noreferrer">{push.fileName || 'Open attachment'}</a>}
+                {destinationLabels.length > 1 && <div className="chat-deduplicated-targets" title={destinationTitles.join(', ')}>Sent to {destinationLabels.join(', ')}</div>}
               </div>
             </div>
             {showAvatar && <img className={`chat-thumbnail${incoming ? ' left' : ''}`} src={avatar.image} title={avatar.label} alt="" onError={(event) => { event.currentTarget.src = asset('chip_other.png') }} />}
@@ -294,18 +329,19 @@ function ClassicPushHistory({ state, target, linkOpen, uploadProgress }: { state
         </Fragment>
       })}
       {uploadProgress && <ClassicUploadProgressBubble upload={uploadProgress} />}
-      {pushes.length > 0 && <div className="chat-date" style={{ textAlign: pushIsOnLeft(pushes[pushes.length - 1], state) ? 'left' : 'right', margin: '0 50px' }}>{formatLastPushAge(pushTimestamp(pushes[pushes.length - 1]))}</div>}
+      {displayGroups.length > 0 && <div className="chat-date" style={{ textAlign: pushIsOnLeft(displayGroups[displayGroups.length - 1].push, state) ? 'left' : 'right', margin: '0 50px' }}>{formatLastPushAge(pushTimestamp(displayGroups[displayGroups.length - 1].push))}</div>}
     </>
   }
 
   return <div id="push-right-top" className={linkOpen ? 'with-link' : undefined}><div id="push-chat-scroll" className="chat-scroll" ref={scrollRef} onScroll={(event) => {
     const element = event.currentTarget
     keepAtBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 24
-    if (element.scrollTop <= 24 && state.pushHistoryCursor) void loadOlderPushes()
+    if (element.scrollTop <= 24 && ((!showAllCachedRef.current && visibleCount < displayGroups.length) || state.pushHistoryCursor)) void loadOlderPushes()
   }}><div id="push-chat-table" className="chat-table"><div id="push-chat-cell" className="chat-cell">{renderPushes()}</div></div></div></div>
 }
 
 function ClassicPushComposer({ state, target, onStateChange, onLinkOpenChange, onUploadProgress, droppedFile, onDroppedFileHandled }: { state: ExtensionState; target: ClassicTarget | null; onStateChange: (state: ExtensionState) => void; onLinkOpenChange: (open: boolean) => void; onUploadProgress: (fileName: string, progress: number | null) => void; droppedFile: File | null; onDroppedFileHandled: () => void }) {
+  const maxUploadBytes = maxUploadBytesForUser(state.user)
   const [body, setBody] = useState('')
   const [linkOpen, setLinkOpenState] = useState(false)
   const [title, setTitle] = useState('')
@@ -346,8 +382,8 @@ function ClassicPushComposer({ state, target, onStateChange, onLinkOpenChange, o
 
   const chooseFile = async (next: File | undefined) => {
     if (!next || busy || !target) return
-    if (next.size < 1 || next.size > MAX_UPLOAD_BYTES) {
-      setStatus(`Files must be smaller than ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB.`)
+    if (next.size < 1 || next.size > maxUploadBytes) {
+      setStatus(`Files must be smaller than ${formatUploadLimit(maxUploadBytes)}.`)
       return
     }
     setBusy(true)
@@ -355,6 +391,7 @@ function ClassicPushComposer({ state, target, onStateChange, onLinkOpenChange, o
     onUploadProgress(next.name, 0)
     try {
       const response = await uploadFileThroughPort(next, {
+        maxUploadBytes,
         target: { deviceIden: target.deviceIden, email: target.email, channelIden: target.channelIden }
       }, (progress) => { setStatus(`Uploading ${progress}%...`); onUploadProgress(next.name, progress) }, (cancel) => setCancelUpload(() => cancel))
       setStatus(`${next.name} sent.`)
@@ -445,6 +482,7 @@ function ClassicPushComposer({ state, target, onStateChange, onLinkOpenChange, o
 }
 
 function ClassicSmsPanel({ state, target, onStateChange, droppedFile, onDroppedFileHandled }: { state: ExtensionState; target: ClassicTarget | null; onStateChange: (state: ExtensionState) => void; droppedFile: File | null; onDroppedFileHandled: () => void }) {
+  const maxUploadBytes = maxUploadBytesForUser(state.user)
   type ClassicSmsLine = { iden?: string; body?: string; direction?: string; created?: number; timestamp?: number; status?: string }
   const [threads, setThreads] = useState<Array<{ id: string; recipients: Array<{ address: string; name?: string }> }>>([])
   const [threadId, setThreadId] = useState('')
@@ -558,8 +596,8 @@ function ClassicSmsPanel({ state, target, onStateChange, droppedFile, onDroppedF
 
   const uploadAttachment = async (file: File | undefined) => {
     if (!file || busy) return
-    if (file.size < 1 || file.size > MAX_UPLOAD_BYTES) {
-      setStatus(`Files must be smaller than ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB.`)
+    if (file.size < 1 || file.size > maxUploadBytes) {
+      setStatus(`Files must be smaller than ${formatUploadLimit(maxUploadBytes)}.`)
       return
     }
     const addresses = composeOpen
@@ -573,6 +611,7 @@ function ClassicSmsPanel({ state, target, onStateChange, droppedFile, onDroppedF
     setUploadProgress({ fileName: file.name, progress: 0 })
     try {
       const response = await uploadFileThroughPort(file, {
+        maxUploadBytes,
         delivery: 'sms',
         target: { deviceIden: target.deviceIden },
         sms: { deviceIden: target.deviceIden, addresses, body: body.trim() || undefined }
@@ -609,37 +648,123 @@ function ClassicSmsPanel({ state, target, onStateChange, droppedFile, onDroppedF
   )
 }
 
-function ClassicNotification({ state, keyName, title, message, url, chatEmail, onStateChange }: { state: ExtensionState; keyName: string; title: string; message: string; url?: string; chatEmail?: string; onStateChange: (state: ExtensionState) => void }) {
-  const dismiss = async () => {
-    const response = await sendExtensionMessage({ type: 'dismiss_notification', key: keyName })
+function ClassicNotification({ notification, onStateChange, onDismiss }: { notification: NotificationRecord; onStateChange: (state: ExtensionState) => void; onDismiss: (active?: boolean) => void }) {
+  const clear = async () => {
+    const response = await sendExtensionMessage({ type: 'clear_notification', key: notification.key })
     if (response.ok) onStateChange(response.state)
   }
+
+  const dismiss = async () => {
+    onDismiss()
+    await new Promise((resolve) => window.setTimeout(resolve, 240))
+    const response = await sendExtensionMessage({ type: 'dismiss_notification', key: notification.key })
+    if (response.ok) onStateChange(response.state)
+    else onDismiss(false)
+  }
+
   const open = async () => {
-    if (url) await chrome.tabs.create({ url, active: true })
-    else if (chatEmail) await chrome.windows.create({ url: chrome.runtime.getURL(`classic-pages/chat-window.html?mode=push&email=${encodeURIComponent(chatEmail)}`), type: 'popup', width: 630, height: 520 })
+    if (notification.kind === 'mute_confirmation') {
+      await clear()
+      return
+    }
+    if (notification.url) await chrome.tabs.create({ url: notification.url, active: true })
+    else if (notification.chatEmail) await chrome.windows.create({ url: chrome.runtime.getURL(`classic-pages/chat-window.html?mode=push&email=${encodeURIComponent(notification.chatEmail)}`), type: 'popup', width: 630, height: 520 })
     await dismiss()
   }
-  return <div className="fake-notification"><div className="fake-notification-close" onClick={() => void dismiss()}><i className="pushfont-close" /></div><div className="fake-notification-text-holder" onClick={() => void open()}><div className="fake-notification-title">{title}</div><div className="fake-notification-message">{message}</div></div></div>
+
+  const runAction = async (actionId: string) => {
+    if (actionId.startsWith('open_')) {
+      await open()
+      return
+    }
+    const response = actionId.startsWith('mute_')
+      ? await sendExtensionMessage({ type: 'mute_notification', key: notification.key })
+        : actionId.startsWith('unmute_')
+          ? await sendExtensionMessage({ type: 'unmute_notification', key: notification.key })
+        : actionId.startsWith('dismiss_')
+          ? (onDismiss(), await new Promise((resolve) => window.setTimeout(resolve, 240)), await sendExtensionMessage({ type: 'dismiss_notification', key: notification.key }))
+          : await sendExtensionMessage({ type: 'clear_notification', key: notification.key })
+    if (response.ok) onStateChange(response.state)
+    else if (actionId.startsWith('dismiss_')) onDismiss(false)
+  }
+
+  const buttons = notification.buttons?.length ? notification.buttons : [{ title: 'Dismiss', actionId: `dismiss_${notification.key}` }]
+  const icon = mirrorIconDataUrl(notification.mirror?.icon) || asset('icon.png')
+  return <article className="fake-notification">
+    <button className="fake-notification-close" type="button" aria-label="Close notification" onClick={() => void (notification.kind === 'mute_confirmation' ? clear() : dismiss())}><i className="pushfont-close" aria-hidden="true" /></button>
+    <button className="fake-notification-text-holder fake-notification-bottom-border" type="button" onClick={() => void open()}>
+      <span className="fake-notification-image-holder"><img className="fake-notification-image" src={icon} alt="" onError={(event) => { event.currentTarget.src = asset('icon.png') }} /></span>
+      <span className="fake-notification-title">{notification.title}</span>
+      <span className="fake-notification-message">{notification.message}</span>
+    </button>
+    {buttons.map((button) => <button className="fake-notification-button fake-notification-bottom-border" type="button" key={button.actionId} onClick={() => void runAction(button.actionId)}>
+      <img className="fake-notification-button-icon" src={asset(notificationActionIcon(button.actionId))} alt="" />
+      <span>{button.title}</span>
+    </button>)}
+  </article>
 }
 
-export function ClassicPanel() {
-  const { state: loadedState, setState, loading } = useClassicState()
-  const [mainTab, setMainTab] = useState<MainTab>('pushing')
-  const [pushTab, setPushTab] = useState<PushTab>('me')
-  const [selectedId, setSelectedId] = useState('everything')
+export function ClassicPanel({ initialState, startupState }: { initialState?: ExtensionState; startupState?: Promise<ExtensionState | undefined> } = {}) {
+  const { state: loadedState, setState, loading } = useClassicState(initialState, startupState)
+  const [preferences] = useState(readPanelPreferences)
+  const [mainTab, setMainTab] = useState<MainTab>(preferences.mainTab)
+  const [pushTab, setPushTab] = useState<PushTab>(preferences.pushTab)
+  const [selectedId, setSelectedId] = useState(preferences.selectedId)
   const [pushLinkOpen, setPushLinkOpen] = useState(false)
   const [fileDragActive, setFileDragActive] = useState(false)
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState<ClassicUploadProgress | null>(null)
+  const [clearingNotifications, setClearingNotifications] = useState(false)
+  const [dismissingNotifications, setDismissingNotifications] = useState<Set<string>>(() => new Set())
+  const [deviceMenu, setDeviceMenu] = useState<{ deviceIden: string; x: number; y: number } | null>(null)
+  const [copyFeedback, setCopyFeedback] = useState('')
+  const deviceMenuRef = useRef<HTMLDivElement>(null)
+  const deviceMenuItemRef = useRef<HTMLButtonElement>(null)
+  const copyFeedbackTimerRef = useRef<number | null>(null)
   const isPopout = location.hash === '#popout'
 
   useEffect(() => {
+    if (!loadedState) return
+    if (!loadedState.user) {
+      cachePanelState(loadedState)
+      return
+    }
+    const id = window.requestIdleCallback(() => cachePanelState(loadedState), { timeout: 500 })
+    return () => window.cancelIdleCallback(id)
+  }, [loadedState])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PANEL_PREFERENCES_CACHE_KEY, JSON.stringify({ mainTab, pushTab, selectedId }))
+    } catch {
+      // Panel preferences continue to be persisted in chrome.storage.
+    }
+  }, [mainTab, pushTab, selectedId])
+
+  useLayoutEffect(() => {
     document.body.classList.toggle('signed-in', Boolean(loadedState?.user))
     document.body.classList.toggle('not-signed-in', Boolean(loadedState && !loadedState.user))
-    document.body.classList.toggle('darkmode', Boolean(loadedState?.settings.darkMode))
     document.body.classList.toggle('popout', isPopout)
-    return () => document.body.classList.remove('signed-in', 'not-signed-in', 'darkmode', 'popout')
+    if (loadedState) {
+      const darkMode = loadedState.settings.darkMode
+      document.body.classList.toggle('darkmode', darkMode)
+      document.documentElement.classList.toggle('darkmode', darkMode)
+      document.documentElement.style.backgroundColor = darkMode ? '#232a2a' : '#ffffff'
+      document.documentElement.style.colorScheme = darkMode ? 'dark' : 'light'
+      try {
+        localStorage.setItem('classicPanelDarkMode', String(darkMode))
+      } catch {
+        // The early theme cache is optional.
+      }
+    }
   }, [isPopout, loadedState?.user, loadedState?.settings.darkMode])
+
+  useLayoutEffect(() => {
+    if (!loadedState || performance.getEntriesByName('classic-popup-ui-ready').length) return
+    performance.mark('classic-popup-ui-ready')
+    performance.measure('Classic popup: initial UI', 'classic-popup-react-entry', 'classic-popup-ui-ready')
+    performance.measure('Classic popup: total UI', 'classic-popup-startup', 'classic-popup-ui-ready')
+  }, [loadedState])
 
   useEffect(() => {
     if (loadedState?.settings.needsDataApproval && !isPopout && !location.pathname.endsWith('/welcome.html')) {
@@ -664,6 +789,40 @@ export function ClassicPanel() {
     void restorePanel().catch(() => undefined)
   }, [])
 
+  useEffect(() => {
+    if (!deviceMenu) return
+    const dismissMenu = (event?: Event) => {
+      if (event?.type === 'pointerdown' && deviceMenuRef.current?.contains(event.target as Node)) return
+      setDeviceMenu(null)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismissMenu()
+    }
+    document.addEventListener('pointerdown', dismissMenu)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('scroll', dismissMenu, true)
+    window.addEventListener('resize', dismissMenu)
+    return () => {
+      document.removeEventListener('pointerdown', dismissMenu)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('scroll', dismissMenu, true)
+      window.removeEventListener('resize', dismissMenu)
+    }
+  }, [deviceMenu])
+
+  useEffect(() => {
+    if (deviceMenu) deviceMenuItemRef.current?.focus()
+  }, [deviceMenu])
+
+  useEffect(() => () => {
+    if (copyFeedbackTimerRef.current !== null) window.clearTimeout(copyFeedbackTimerRef.current)
+  }, [])
+
+  const targets: ClassicTarget[] = useMemo(() => {
+    if (!loadedState || (mainTab !== 'pushing' && mainTab !== 'sms')) return []
+    return mainTab === 'sms' ? Object.values(loadedState.devices).filter((device) => device.hasSms).map((device) => ({ id: `sms:${device.iden}`, label: device.nickname || device.model || device.iden, secondary: 'SMS', image: asset(`chip_${device.icon || device.type || 'phone'}.png`), deviceIden: device.iden })) : classicTargets(loadedState, pushTab)
+  }, [mainTab, pushTab, loadedState?.devices, loadedState?.chats, loadedState?.subscriptions, loadedState?.pushes, loadedState?.settings.showSentPushesInDeviceHistory])
+
   if (loading && !loadedState) return <div id="container" />
   if (!loadedState) return <div id="container" />
   if (!loadedState.user) return <ClassicAuth state={loadedState} onStateChange={setState} />
@@ -671,7 +830,6 @@ export function ClassicPanel() {
   const state = loadedState
   const user = state.user
   if (!user) return <ClassicAuth state={state} onStateChange={setState} />
-  const targets: ClassicTarget[] = mainTab === 'sms' ? Object.values(state.devices).filter((device) => device.hasSms).map((device) => ({ id: `sms:${device.iden}`, label: device.nickname || device.model || device.iden, secondary: 'SMS', image: asset(`chip_${device.icon || device.type || 'phone'}.png`), deviceIden: device.iden })) : classicTargets(state, pushTab)
   const target = targets.find((item) => item.id === selectedId) || targets[0] || null
 
   const openChat = async (nextTarget: ClassicTarget) => {
@@ -689,13 +847,42 @@ export function ClassicPanel() {
     if (response.ok) setState(response.state)
   }
 
+  const clearAllNotifications = async () => {
+    const notificationCount = Object.keys(state.notifications).length
+    if (clearingNotifications || !notificationCount) return
+    setClearingNotifications(true)
+    await new Promise((resolve) => window.setTimeout(resolve, 240 + (notificationCount - 1) * 60))
+    try {
+      const response = await sendExtensionMessage({ type: 'clear_all_notifications' })
+      if (response.ok) setState(response.state)
+    } catch (error) {
+      console.warn('Could not clear notifications:', error)
+    } finally {
+      setClearingNotifications(false)
+    }
+  }
+
+  const dismissNotificationWithAnimation = (key: string, active = true) => {
+    if (!active) {
+      setDismissingNotifications((current) => {
+        const next = new Set(current)
+        next.delete(key)
+        return next
+      })
+      return
+    }
+    setDismissingNotifications((current) => new Set(current).add(key))
+  }
+
   const selectMainTab = (tab: MainTab) => {
+    setDeviceMenu(null)
     setMainTab(tab)
     setPushLinkOpen(false)
     void chrome.storage.local.set({ activePanelTab: tab, classicMainTab: tab })
   }
 
   const selectPushTab = (tab: PushTab) => {
+    setDeviceMenu(null)
     setPushTab(tab)
     setPushLinkOpen(false)
     setSelectedId(tab === 'me' ? 'everything' : '')
@@ -703,6 +890,7 @@ export function ClassicPanel() {
   }
 
   const selectTarget = (id: string) => {
+    setDeviceMenu(null)
     setSelectedId(id)
     setPushLinkOpen(false)
     const legacyKey = pushTab === 'friends' ? 'lastFriendTargetId' : pushTab === 'following' ? 'lastFollowingTargetId' : 'lastMeTargetId'
@@ -728,8 +916,54 @@ export function ClassicPanel() {
     if ((mainTab === 'pushing' || mainTab === 'sms') && file) setDroppedFile(file)
   }
 
+  const openDeviceMenu = (event: MouseEvent<HTMLDivElement>, deviceIden: string) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const menuWidth = 184
+    const menuHeight = 44
+    setDeviceMenu({
+      deviceIden,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8))
+    })
+  }
+
+  const copyDeviceId = async () => {
+    if (!deviceMenu) return
+    let copied = false
+    try {
+      await navigator.clipboard.writeText(deviceMenu.deviceIden)
+      copied = true
+    } catch {
+      const temporaryInput = document.createElement('textarea')
+      try {
+        temporaryInput.value = deviceMenu.deviceIden
+        temporaryInput.setAttribute('readonly', '')
+        temporaryInput.style.position = 'fixed'
+        temporaryInput.style.opacity = '0'
+        document.body.appendChild(temporaryInput)
+        temporaryInput.select()
+        copied = document.execCommand('copy')
+      } catch {
+        copied = false
+      } finally {
+        temporaryInput.remove()
+      }
+    }
+    setDeviceMenu(null)
+    setCopyFeedback(copied ? 'Device ID copied' : 'Could not copy device ID')
+    if (copyFeedbackTimerRef.current !== null) window.clearTimeout(copyFeedbackTimerRef.current)
+    copyFeedbackTimerRef.current = window.setTimeout(() => {
+      setCopyFeedback('')
+      copyFeedbackTimerRef.current = null
+    }, 1800)
+  }
+
   const renderTargetRows = () => <>
-    {targets.map((item) => <ClassicStreamRow key={item.id} target={item} selected={item.id === target?.id} onSelect={() => selectTarget(item.id)} onPopout={() => void openChat(item)} />)}
+    {targets.map((item) => {
+      const showDeviceId = mainTab === 'pushing' && pushTab === 'me' && Boolean(item.deviceIden)
+      return <ClassicStreamRow key={item.id} target={item} selected={item.id === target?.id} onSelect={() => selectTarget(item.id)} onPopout={() => void openChat(item)} showDeviceId={showDeviceId} onDeviceContextMenu={showDeviceId ? (event) => openDeviceMenu(event, item.deviceIden!) : undefined} />
+    })}
     {pushTab === 'friends' && <ClassicActionRow image={asset('chip_add.png')} label="Add a friend" onClick={() => openSite('/#people/new')} />}
     {pushTab === 'following' && <ClassicActionRow image={asset('chip_add.png')} label="Explore channels" onClick={() => openSite('/channels')} />}
   </>
@@ -744,21 +978,28 @@ export function ClassicPanel() {
               <div id="messaging-content-right" onDragEnter={handleFileDragOver} onDragOver={handleFileDragOver} onDragLeave={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFileDragActive(false)
               }} onDrop={handleFileDrop}>
-              {mainTab === 'pushing' ? <div id="push-right"><ClassicPushHistory state={state} target={target} linkOpen={pushLinkOpen} uploadProgress={uploadProgress} />{target?.channelIden ? <div id="push-right-bottom" /> : <ClassicPushComposer key={target?.id || 'none'} state={state} target={target} onStateChange={setState} onLinkOpenChange={setPushLinkOpen} onUploadProgress={(fileName, progress) => setUploadProgress(progress === null ? null : { fileName, progress })} droppedFile={droppedFile} onDroppedFileHandled={() => setDroppedFile(null)} />}</div> : <ClassicSmsPanel state={state} target={target} onStateChange={setState} droppedFile={droppedFile} onDroppedFileHandled={() => setDroppedFile(null)} />}
+               {mainTab === 'pushing' ? <div id="push-right"><ClassicPushHistory key={`history:${target?.id || 'none'}`} state={state} target={target} linkOpen={pushLinkOpen} uploadProgress={uploadProgress} />{target?.channelIden ? <div id="push-right-bottom" /> : <ClassicPushComposer key={`composer:${target?.id || 'none'}`} state={state} target={target} onStateChange={setState} onLinkOpenChange={setPushLinkOpen} onUploadProgress={(fileName, progress) => setUploadProgress(progress === null ? null : { fileName, progress })} droppedFile={droppedFile} onDroppedFileHandled={() => setDroppedFile(null)} />}</div> : mainTab === 'sms' ? <ClassicSmsPanel state={state} target={target} onStateChange={setState} droppedFile={droppedFile} onDroppedFileHandled={() => setDroppedFile(null)} /> : null}
                 <div id="drop-zone" className="drop-zone" style={{ display: fileDragActive && (mainTab === 'pushing' || mainTab === 'sms') ? 'block' : undefined }}><img id="drop-zone-image" className="drop-zone-image" src={asset('upload.png')} alt="" /></div>
-                <div id="messaging-banner" />
+                 <div id="messaging-banner"><LargeUploadAuthNotice user={state.user} className="classic-large-upload-auth-notice" /></div>
               </div>
               <div id="messaging-top"><div id="push-top" style={{ height: '100%', display: mainTab === 'pushing' ? 'block' : 'none' }}><div style={{ margin: '0 120px', height: '100%' }}><div className="tabs"><span id="friends-tab" className={`tab top-tab${pushTab === 'friends' ? ' selected' : ''}`} onClick={() => selectPushTab('friends')}>Friends</span><span id="me-tab" className={`tab top-tab${pushTab === 'me' ? ' selected' : ''}`} onClick={() => selectPushTab('me')}>Me</span><span id="following-tab" className={`tab top-tab${pushTab === 'following' ? ' selected' : ''}`} onClick={() => selectPushTab('following')}>Following</span></div></div></div><div id="sms-top" style={{ height: '100%', display: mainTab === 'sms' ? 'block' : 'none' }} /></div>
             </div>
-             <div id="notifications-content" className="tab-content" style={{ display: mainTab === 'notifications' ? 'block' : 'none' }}><div id="notifications-top"><div id="snooze-holder" onClick={() => void toggleSnooze()}>{state.settings.snoozedUntil > Date.now() ? 'Wake' : 'Snooze'}</div></div><div id="notifications-holder">{Object.values(state.notifications).map((notification) => <ClassicNotification key={notification.key} state={state} keyName={notification.key} title={notification.title} message={notification.message} url={notification.url} chatEmail={notification.chatEmail} onStateChange={setState} />)}</div><div id="notifications-empty" style={{ display: Object.keys(state.notifications).length ? 'none' : 'block' }}><div id="notifications-empty-text">No notifications.</div></div></div>
+              <div id="notifications-content" className="tab-content" style={{ display: mainTab === 'notifications' ? 'block' : 'none' }}>{mainTab === 'notifications' && <><div id="notifications-top"><button id="snooze-holder" type="button" onClick={() => void toggleSnooze()}>{state.settings.snoozedUntil > Date.now() ? 'Wake' : 'Snooze'}</button></div><div id="notifications-holder" className={clearingNotifications ? 'notifications-clearing' : ''} aria-busy={clearingNotifications}><div className="notification-list-toolbar"><button className="notification-clear-all" type="button" aria-label="Clear all notifications" title="Clear all notifications" onClick={() => void clearAllNotifications()} disabled={!Object.keys(state.notifications).length || clearingNotifications}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h16M4 12h16M1 19h16" /></svg></button></div>{Object.values(state.notifications).sort((first, second) => second.createdAt - first.createdAt).map((notification, index) => <div className={`notification-dismiss-wrap${dismissingNotifications.has(notification.key) ? ' notification-dismissing' : ''}`} key={notification.key} style={{ transitionDelay: clearingNotifications ? `${index * 60}ms` : undefined }}><ClassicNotification notification={notification} onStateChange={setState} onDismiss={() => dismissNotificationWithAnimation(notification.key)} /></div>)}</div><div id="notifications-empty" style={{ display: Object.keys(state.notifications).length ? 'none' : 'block' }}><div id="notifications-empty-text">No notifications.</div></div></>}</div>
              <div id="account-content" className="tab-content" style={{ display: mainTab === 'account' ? 'block' : 'none' }}><div id="account-top"><div style={{ padding: '20px' }}><div id="account-holder"><img id="account-image" src={user.imageUrl || asset('chip_person.png')} alt="" /><img id="ribbon" style={{ display: user.pro ? 'block' : 'none' }} src={asset('ribbon.png')} alt="" /></div><div style={{ marginTop: '10px' }}><span id="account-email">{user.email}</span></div></div></div><div id="account-bottom"><div className="account-item"><a href="https://pushbullet.com/pro" target="_blank" rel="noreferrer"><span id="pushbullet-pro" className="account-item-label">Pushbullet Pro</span></a></div><div className="account-item"><a href="options.html"><i className="pushfont-gear" style={{ width: '20px' }} /><span id="settings" className="account-item-label">Settings</span></a></div><div className="account-item"><a id="sign-out-link" onClick={() => void signOut()}><i className="pushfont-close" style={{ width: '20px' }} /><span id="sign-out" className="account-item-label">Sign out</span></a></div></div></div>
           </div>
           <div style={{ position: 'absolute', top: '6px', left: '10px' }}><a href="https://www.pushbullet.com" target="_blank" rel="noreferrer"><img src={asset('icon.png')} height="36" width="36" alt="Pushbullet" /></a></div>
         </div>
           <div id="footer"><div style={{ margin: '0 60px', height: '100%' }}><div className="tabs"><ClassicFooterTab id="pushing-tab" icon="pushfont-bubble" label="Pushing" selected={mainTab === 'pushing'} onClick={() => selectMainTab('pushing')} /><ClassicFooterTab id="sms-tab" icon="pushfont-message" label="SMS" selected={mainTab === 'sms'} onClick={() => selectMainTab('sms')} /><ClassicFooterTab id="notifications-tab" icon="pushfont-bell" label="Notifications" selected={mainTab === 'notifications'} onClick={() => selectMainTab('notifications')} /><ClassicFooterTab id="account-tab" icon="" label="Account" selected={mainTab === 'account'} onClick={() => selectMainTab('account')} /></div></div></div>
         <input type="file" id="file-input" name="upload" style={{ display: 'none' }} />
-         <div id="popout-holder" style={{ display: isPopout ? 'none' : undefined }} onClick={() => void chrome.windows.create({ url: chrome.runtime.getURL('classic-pages/panel.html#popout'), type: 'popup', width: 630, height: 520 })}><i className="pushfont-popout" /></div>
-      </div>
+          <div id="popout-holder" style={{ display: isPopout ? 'none' : undefined }} onClick={() => void chrome.windows.create({ url: chrome.runtime.getURL('classic-pages/panel.html#popout'), type: 'popup', width: 630, height: 520 })}><i className="pushfont-popout" /></div>
+          {deviceMenu && <div ref={deviceMenuRef} className="classic-device-context-menu" role="menu" style={{ left: deviceMenu.x, top: deviceMenu.y }}>
+            <button ref={deviceMenuItemRef} className="classic-device-context-menu-item" type="button" role="menuitem" onClick={() => void copyDeviceId()}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>
+              <span>Copy Device ID</span>
+            </button>
+          </div>}
+          {copyFeedback && <div className="classic-device-copy-toast" role="status">{copyFeedback}</div>}
+       </div>
     </div>
   )
 }

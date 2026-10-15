@@ -95,7 +95,7 @@ function normalizePushMap(value: unknown): EntityMap<Push> {
   }))
 }
 
-function normalizeState(value: unknown): ExtensionState {
+export function normalizeState(value: unknown): ExtensionState {
   const saved = parseRecord(value) as Partial<ExtensionState>
   const state = createDefaultState()
   return {

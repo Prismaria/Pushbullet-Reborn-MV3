@@ -3,6 +3,7 @@ import { broadcastState } from './events'
 import { readState, updateState } from './state'
 import { isChatActive } from './sms'
 import { mirrorIdentity, type ExtensionState, type MirrorDetails, type NotificationRecord, type Push } from '../shared/models'
+import { mirrorIconDataUrl, mirrorImageDataUrl } from '../shared/mirror-images'
 import { validateHttpUrl } from '../shared/validation'
 
 const ICON_URL = 'icon_48.png'
@@ -22,7 +23,7 @@ function chatUrl(email: string): string {
 }
 
 function notificationKey(push: Push): string {
-  return push.type === 'mirror' ? `mirror_${mirrorIdentity(push.mirror, push.iden)}` : `push_${push.iden}`
+  return push.type === 'mirror' ? `mirror_${mirrorIdentity(push.mirror)}` : `push_${push.iden}`
 }
 
 function notificationAlarmName(key: string): string {
@@ -45,24 +46,53 @@ function mirrorMessage(mirror: MirrorDetails | undefined): { title: string; mess
   }
 }
 
-async function createNativeNotification(key: string, record: NotificationRecord): Promise<void> {
-  if (!chrome.notifications) return
-  const buttons = (record.buttons || []).map((button) => ({
-    title: button.title,
-    iconUrl: chrome.runtime.getURL(ICON_URL)
+function canMuteMirror(mirror: MirrorDetails | undefined): boolean {
+  return Boolean(mirror?.packageName && !mirror.conversationIden && mirror.packageName !== 'com.pushbullet.android')
+}
+
+function nativeNotificationOptions(record: NotificationRecord, iconOverride?: string, includeImage = true): chrome.notifications.NotificationOptions<true> {
+  const buttons = (record.buttons || []).slice(0, 2).map((button) => ({
+    title: button.title
   }))
-  await new Promise<void>((resolve) => {
-    chrome.notifications.create(key, {
-      type: 'basic',
-      title: record.title,
-      message: record.message,
-      iconUrl: chrome.runtime.getURL(ICON_URL),
-      priority: 0,
-      isClickable: true,
-      buttons
-    }, () => {
-      void chrome.runtime.lastError
-      resolve()
+  const iconUrl = iconOverride || mirrorIconDataUrl(record.mirror?.icon) || chrome.runtime.getURL(ICON_URL)
+  const imageUrl = includeImage ? mirrorImageDataUrl(record.mirror?.image) : null
+  const baseOptions = {
+    title: record.title,
+    message: record.message,
+    iconUrl,
+    priority: 0,
+    isClickable: true,
+    buttons
+  }
+  return imageUrl
+    ? { ...baseOptions, type: 'image', imageUrl }
+    : { ...baseOptions, type: 'basic' }
+}
+
+async function createNativeNotification(key: string, record: NotificationRecord): Promise<boolean> {
+  if (!chrome.notifications) return false
+
+  const create = async (options: chrome.notifications.NotificationOptions<true>): Promise<boolean> => new Promise<boolean>((resolve) => {
+    chrome.notifications.create(key, options, () => {
+      const error = chrome.runtime.lastError
+      if (error) console.warn('Could not create Pushbullet notification:', error.message)
+      resolve(!error)
+    })
+  })
+
+  const preferredOptions = nativeNotificationOptions(record)
+  if (await create(preferredOptions)) return true
+
+  return create(nativeNotificationOptions(record, chrome.runtime.getURL(ICON_URL), false))
+}
+
+async function updateNativeNotification(key: string, record: NotificationRecord): Promise<boolean> {
+  if (!chrome.notifications || typeof chrome.notifications.update !== 'function') return false
+  return new Promise<boolean>((resolve) => {
+    chrome.notifications.update(key, nativeNotificationOptions(record), (updated) => {
+      const error = chrome.runtime.lastError
+      if (error) console.warn('Could not update Pushbullet notification:', error.message)
+      resolve(!error && updated !== false)
     })
   })
 }
@@ -77,11 +107,15 @@ async function clearNativeNotification(key: string): Promise<void> {
   })
 }
 
+async function clearNotificationTimer(key: string): Promise<void> {
+  if (chrome.alarms) await chrome.alarms.clear(notificationAlarmName(key))
+}
+
 async function updateBadge(state: ExtensionState): Promise<void> {
   if (!chrome.action) return
   const count = state.settings.showNotificationCount ? Object.keys(state.notifications).length : 0
   await chrome.action.setBadgeText({ text: count ? String(Math.min(count, 99)) : '' })
-  if (count) await chrome.action.setBadgeBackgroundColor({ color: '#7edc99' })
+  await chrome.action.setBadgeBackgroundColor({ color: state.settings.useGreenNotificationBadge ? '#7edc99' : '#e85845' })
 }
 
 async function playAlertSound(): Promise<void> {
@@ -107,7 +141,7 @@ async function playAlertSound(): Promise<void> {
 
 async function removeNotification(key: string, clearNative: boolean): Promise<ExtensionState> {
   if (clearNative) await clearNativeNotification(key)
-  if (chrome.alarms) await chrome.alarms.clear(notificationAlarmName(key))
+  await clearNotificationTimer(key)
   const next = await updateState((state) => {
     if (!state.notifications[key]) return state
     const notifications = { ...state.notifications }
@@ -143,12 +177,11 @@ async function dismissMirror(mirror: MirrorDetails | undefined): Promise<void> {
         type: 'push',
         push: {
           type: 'dismissal',
-           source_user_iden: mirror.sourceUserIden,
-          source_device_iden: mirror.sourceDeviceIden,
+          source_user_iden: mirror.sourceUserIden,
           package_name: mirror.packageName,
           notification_id: mirror.notificationId,
           notification_tag: mirror.notificationTag,
-          conversation_iden: mirror.conversationIden
+          ...(mirror.conversationIden ? { conversation_iden: mirror.conversationIden } : {})
         }
       })
     })
@@ -157,12 +190,103 @@ async function dismissMirror(mirror: MirrorDetails | undefined): Promise<void> {
   }
 }
 
+async function sendMirrorCommand(mirror: MirrorDetails | undefined, type: 'mute' | 'unmute'): Promise<boolean> {
+  if (!mirror?.packageName) return false
+  try {
+    await apiRequest('/v2/ephemerals', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'push',
+        push: {
+          type,
+          source_user_iden: mirror.sourceUserIden,
+          package_name: mirror.packageName
+        }
+      })
+    })
+    return true
+  } catch (error) {
+    console.warn(`Could not ${type} mirrored application:`, error)
+    return false
+  }
+}
+
 export async function dismissNotification(key: string): Promise<void> {
   const state = await readState()
   const record = state.notifications[key]
   if (!record) return
+  if (record.kind === 'mute_confirmation') {
+    await removeNotification(key, true)
+    return
+  }
   if (record.pushIden) await dismissRemotePush(record.pushIden)
   else await dismissMirror(record.mirror)
+  await removeNotification(key, true)
+}
+
+export async function clearAllNotifications(): Promise<void> {
+  const state = await readState()
+  const keys = Object.keys(state.notifications)
+  if (state.settings.dismissMirrorsOnClearAll) {
+    const mirrors = Object.values(state.notifications)
+      .filter((record) => record.kind !== 'mute_confirmation' && record.mirror)
+    await Promise.all(mirrors.map((record) => dismissMirror(record.mirror)))
+  }
+  const next = await updateState((current) => ({ ...current, notifications: {} }))
+  await clearNativeNotifications(keys)
+  await updateBadge(next)
+  await broadcastState(next)
+}
+
+export async function muteNotification(key: string): Promise<void> {
+  const state = await readState()
+  const record = state.notifications[key]
+  if (!record || record.kind === 'mute_confirmation' || !canMuteMirror(record.mirror)) return
+  if (!await sendMirrorCommand(record.mirror, 'mute')) return
+
+  const mirror = record.mirror
+  const applicationName = mirror?.applicationName || mirror?.packageName || 'application'
+  const next = await updateState((current) => {
+    const currentRecord = current.notifications[key]
+    if (!currentRecord) return current
+    return {
+      ...current,
+      notifications: {
+        ...current.notifications,
+        [key]: {
+          ...currentRecord,
+          kind: 'mute_confirmation',
+          title: `Muted ${applicationName}`,
+          message: '',
+          pushIden: undefined,
+          chatEmail: undefined,
+          url: undefined,
+          actionId: `unmute_${key}`,
+          buttons: [
+            { title: `Unmute ${applicationName}`, actionId: `unmute_${key}` },
+            { title: 'Done', actionId: `done_${key}` }
+          ],
+          createdAt: Date.now()
+        }
+      }
+    }
+  })
+  const confirmation = next.notifications[key]
+  if (!confirmation) return
+  if (!await updateNativeNotification(key, confirmation)) {
+    await clearNativeNotification(key)
+    await createNativeNotification(key, confirmation)
+  }
+  await clearNotificationTimer(key)
+  await updateBadge(next)
+  await broadcastState(next)
+}
+
+export async function unmuteNotification(key: string): Promise<void> {
+  const state = await readState()
+  const record = state.notifications[key]
+  if (!record || record.kind !== 'mute_confirmation' || !record.mirror) return
+  if (!await sendMirrorCommand(record.mirror, 'unmute')) return
   await removeNotification(key, true)
 }
 
@@ -194,11 +318,17 @@ export async function notifyForPush(push: Push): Promise<void> {
     chatEmail: push.type === 'mirror' ? undefined : chatEmail,
     url: url || undefined,
     mirror: push.mirror,
-    actionId: url ? `open_${push.iden}` : `dismiss_${push.iden}`,
-    buttons: [
-      ...(url ? [{ title: 'Open', actionId: `open_${push.iden}` }] : []),
-      { title: 'Dismiss', actionId: `dismiss_${key}` }
-    ],
+    actionId: url ? `open_${push.iden}` : `dismiss_${key}`,
+    buttons: push.type === 'mirror'
+      ? [
+        ...(canMuteMirror(push.mirror) ? [{ title: `Mute ${mirror.title}`, actionId: `mute_${key}` }] : []),
+        { title: 'Dismiss', actionId: `dismiss_${key}` }
+      ]
+      : [
+        ...(url ? [{ title: 'Open', actionId: `open_${push.iden}` }] : []),
+        { title: 'Dismiss', actionId: `dismiss_${key}` }
+      ],
+    kind: 'notification',
     createdAt: Date.now()
   }
   const next = await updateState((current) => ({
@@ -227,7 +357,7 @@ export async function refreshNotificationBadge(): Promise<void> {
 export async function clearNativeNotifications(keys: string[]): Promise<void> {
   await Promise.all(keys.map(async (key) => {
     await clearNativeNotification(key)
-    if (chrome.alarms) await chrome.alarms.clear(notificationAlarmName(key))
+    await clearNotificationTimer(key)
   }))
 }
 
@@ -257,8 +387,20 @@ export async function handleNotificationButton(key: string, index: number): Prom
     if (url) await chrome.tabs.create({ url, active: true })
   } else if (button.actionId.startsWith('chat_') && record.chatEmail) {
     await chrome.windows.create({ url: chatUrl(record.chatEmail), type: 'popup', width: 630, height: 520 })
-  } else {
+  } else if (button.actionId.startsWith('mute_')) {
+    await muteNotification(key)
+    return
+  } else if (button.actionId.startsWith('unmute_')) {
+    await unmuteNotification(key)
+    return
+  } else if (button.actionId.startsWith('done_')) {
+    await clearNotification(key)
+    return
+  } else if (button.actionId.startsWith('dismiss_')) {
     await dismissNotification(key)
+    return
+  } else {
+    await clearNotification(key)
     return
   }
   await removeNotification(key, true)
@@ -278,7 +420,7 @@ export function registerNotificationListeners(): void {
     void handleNotificationClick(key).catch((error) => console.warn('Notification click failed:', error))
   })
   chrome.notifications.onButtonClicked.addListener((key, index) => {
-    void handleNotificationButton(key, index).catch((error) => console.warn('Notification action failed:', error))
+    void (index < 0 ? handleNotificationClick(key) : handleNotificationButton(key, index)).catch((error) => console.warn('Notification action failed:', error))
   })
   chrome.notifications.onClosed.addListener((key) => {
     void handleNotificationClosed(key).catch((error) => console.warn('Notification close failed:', error))

@@ -9,6 +9,7 @@ import type {
 export type ExtensionMessage =
   | { type: 'ping' }
   | { type: 'get_state' }
+  | { type: 'get_large_upload_auth' }
   | { type: 'set_token'; token: string }
   | { type: 'sign_out' }
   | { type: 'refresh_state' }
@@ -16,6 +17,10 @@ export type ExtensionMessage =
   | { type: 'save_settings'; settings: Partial<ExtensionSettings> }
   | { type: 'send_push'; push: PushDraft }
   | { type: 'dismiss_notification'; key: string }
+  | { type: 'clear_notification'; key: string }
+  | { type: 'clear_all_notifications' }
+  | { type: 'mute_notification'; key: string }
+  | { type: 'unmute_notification'; key: string }
   | { type: 'set_snooze'; enabled: boolean }
   | { type: 'get_sms_threads'; deviceIden: string }
   | { type: 'get_sms_thread'; deviceIden: string; threadId: string }
@@ -27,6 +32,7 @@ export type ExtensionMessage =
 type ErrorResponse = { ok: false; error: string }
 type PingResponse = { ok: true; service: 'background' } | ErrorResponse
 type StateResponse = { ok: true; state: ExtensionState } | ErrorResponse
+type UploadAuthResponse = { ok: true; available: boolean } | ErrorResponse
 type PushResponse = { ok: true; state: ExtensionState; push: unknown } | ErrorResponse
 type SmsThreadsResponse = { ok: true; threads: unknown[] } | ErrorResponse
 type SmsThreadResponse = { ok: true; messages: unknown[] } | ErrorResponse
@@ -36,14 +42,19 @@ type SmsResponse = { ok: true; state: ExtensionState; sms: unknown } | ErrorResp
 export type MessageResponse<TMessage extends ExtensionMessage> =
   TMessage extends { type: 'ping' } ? PingResponse
     : TMessage extends { type: 'get_state' } ? StateResponse
+      : TMessage extends { type: 'get_large_upload_auth' } ? UploadAuthResponse
       : TMessage extends { type: 'set_token' } ? StateResponse
         : TMessage extends { type: 'sign_out' } ? StateResponse
       : TMessage extends { type: 'refresh_state' } ? StateResponse
         : TMessage extends { type: 'load_more_push_history' } ? StateResponse
               : TMessage extends { type: 'save_settings' } ? StateResponse
-                : TMessage extends { type: 'send_push' } ? PushResponse
-                  : TMessage extends { type: 'dismiss_notification' } ? StateResponse
-                    : TMessage extends { type: 'set_snooze' } ? StateResponse
+                  : TMessage extends { type: 'send_push' } ? PushResponse
+                   : TMessage extends { type: 'dismiss_notification' } ? StateResponse
+                    : TMessage extends { type: 'clear_notification' } ? StateResponse
+                      : TMessage extends { type: 'clear_all_notifications' } ? StateResponse
+                        : TMessage extends { type: 'mute_notification' } ? StateResponse
+                          : TMessage extends { type: 'unmute_notification' } ? StateResponse
+                     : TMessage extends { type: 'set_snooze' } ? StateResponse
                       : TMessage extends { type: 'get_sms_threads' } ? SmsThreadsResponse
                         : TMessage extends { type: 'get_sms_thread' } ? SmsThreadResponse
                           : TMessage extends { type: 'send_sms' } ? SmsResponse
@@ -56,8 +67,8 @@ export type ExtensionResponse = MessageResponse<ExtensionMessage>
 
 const BOOLEAN_SETTING_KEYS = new Set([
   'darkMode', 'openMyLinksAutomatically', 'onlyShowTitles', 'useDarkIcon', 'playSound',
-  'showMirrors', 'showContextMenu', 'showNotificationCount', 'hideSignInReminder',
-  'allowInstantPush', 'automaticallyAttachLink', 'disableAnalytics', 'needsDataApproval'
+  'showMirrors', 'dismissMirrorsOnClearAll', 'useGreenNotificationBadge', 'showContextMenu', 'showNotificationCount', 'hideSignInReminder',
+  'allowInstantPush', 'automaticallyAttachLink', 'showSentPushesInDeviceHistory', 'disableAnalytics', 'needsDataApproval'
 ])
 const SETTING_KEYS = new Set([...BOOLEAN_SETTING_KEYS, 'notificationDuration', 'snoozedUntil', 'instantPushIden'])
 
@@ -81,7 +92,7 @@ export function isExtensionMessage(value: unknown): value is ExtensionMessage {
     sms?: unknown
   }
 
-  if (message.type === 'ping' || message.type === 'get_state' || message.type === 'sign_out' || message.type === 'refresh_state' || message.type === 'load_more_push_history') {
+  if (message.type === 'ping' || message.type === 'get_state' || message.type === 'get_large_upload_auth' || message.type === 'sign_out' || message.type === 'refresh_state' || message.type === 'load_more_push_history') {
     return true
   }
   if (message.type === 'set_token') return typeof message.token === 'string' && message.token.trim().length > 0
@@ -93,7 +104,11 @@ export function isExtensionMessage(value: unknown): value is ExtensionMessage {
       && (push.title === undefined || typeof push.title === 'string')
       && (push.url === undefined || typeof push.url === 'string')
   }
-  if (message.type === 'dismiss_notification') return typeof message.key === 'string' && message.key.length > 0
+  if (message.type === 'dismiss_notification'
+    || message.type === 'clear_notification'
+    || message.type === 'mute_notification'
+    || message.type === 'unmute_notification') return typeof message.key === 'string' && message.key.length > 0
+  if (message.type === 'clear_all_notifications') return true
   if (message.type === 'set_snooze') return typeof message.enabled === 'boolean'
   if (message.type === 'get_sms_threads') return typeof message.deviceIden === 'string' && message.deviceIden.length > 0
   if (message.type === 'get_sms_thread') return typeof message.deviceIden === 'string' && typeof message.threadId === 'string' && message.threadId.length > 0
@@ -151,6 +166,7 @@ export function toExtensionUser(value: unknown): ExtensionUser {
   }
   if (!value || typeof value !== 'object') return null
   const user = value as Record<string, unknown>
+  const maxUploadSize = typeof user.maxUploadSize === 'number' ? user.maxUploadSize : user.max_upload_size
   return {
     iden: typeof user.iden === 'string' ? user.iden : undefined,
     email: typeof user.email === 'string' ? user.email : undefined,
@@ -158,6 +174,7 @@ export function toExtensionUser(value: unknown): ExtensionUser {
     name: typeof user.name === 'string' ? user.name : undefined,
     imageUrl: typeof user.imageUrl === 'string' ? user.imageUrl : typeof user.image_url === 'string' ? user.image_url : undefined,
     pro: user.pro === true,
+    maxUploadSize: typeof maxUploadSize === 'number' && Number.isSafeInteger(maxUploadSize) && maxUploadSize > 0 ? maxUploadSize : undefined,
     replyCountQuota: typeof user.replyCountQuota === 'number' || typeof user.replyCountQuota === 'string'
       ? user.replyCountQuota
       : typeof user.reply_count_quota === 'number' || typeof user.reply_count_quota === 'string' ? user.reply_count_quota : undefined

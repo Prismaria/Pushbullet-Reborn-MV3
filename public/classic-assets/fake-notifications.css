@@ -14,6 +14,10 @@
     height: 28px;
     width: 28px;
     padding: 6px;
+    border: 0;
+    border-radius: 0;
+    color: inherit;
+    background: transparent;
     cursor: pointer;
 }
 .fake-notification-close:hover {
@@ -39,12 +43,24 @@
     margin: auto;
 }
 .fake-notification-text-holder {
+    display: block;
+    width: 100%;
     cursor: pointer;
     overflow: hidden;
     min-height: 80px;
     padding: 6px 26px 0 96px;
+    border: 0;
+    border-radius: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    text-align: left;
 }
-.fake-notification-text-holder div {
+.fake-notification-text-holder:hover {
+    background-color: #f5f5f5;
+}
+.fake-notification-text-holder > span:not(.fake-notification-image-holder) {
+    display: block;
     margin-bottom: 4px;
 }
 .fake-notification-title {
@@ -67,9 +83,19 @@
     text-overflow: ellipsis;
 }
 .fake-notification-button {
+    display: block;
+    width: 100%;
     overflow: hidden;
-    cursor: default;
+    border-top: 0;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
     padding: 0 16px;
+    font: inherit;
+    text-align: left;
 }
 .fake-notification-button:hover {
     background-color: #f5f5f5;
@@ -84,6 +110,12 @@
 .fake-notification-button span {
     font-size: 13px;
     line-height: 40px;
+}
+.fake-notification-close:focus-visible,
+.fake-notification-text-holder:focus-visible,
+.fake-notification-button:focus-visible {
+    outline: 2px solid #4ab367;
+    outline-offset: -2px;
 }
 .fake-notification-bottom-border {
     border-bottom: 1px solid #eee;

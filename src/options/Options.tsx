@@ -23,11 +23,13 @@ const appearanceSettings: BooleanSetting[] = [
 const notificationSettings: BooleanSetting[] = [
   { key: 'playSound', title: 'Play notification sounds', description: 'Play the alert sound through the offscreen audio document.' },
   { key: 'showMirrors', title: 'Show mirrored notifications', description: 'Allow notifications mirrored from mobile devices.' },
+  { key: 'dismissMirrorsOnClearAll', title: 'Dismiss mirrored notifications on device', description: 'When clearing all notifications, also dismiss mirrored notifications on their source devices.' },
   { key: 'showNotificationCount', title: 'Show notification count', description: 'Keep the action badge synchronized with active notifications.' },
   { key: 'openMyLinksAutomatically', title: 'Open incoming links', description: 'Open incoming link pushes in a background tab.' }
 ]
 
 const behaviorSettings: BooleanSetting[] = [
+  { key: 'showSentPushesInDeviceHistory', title: 'Show sent pushes in device history', description: "On: show pushes in both sender and receiver device histories. Off: show them only in the receiver's history." },
   { key: 'automaticallyAttachLink', title: 'Attach the active link', description: 'Prefer the current tab when composing a link push.' },
   { key: 'showContextMenu', title: 'Show context-menu actions', description: 'Expose Pushbullet actions on pages, links, and selected text.' },
   { key: 'allowInstantPush', title: 'Allow instant push command', description: 'Allow the configured keyboard command to send the active tab.' },
@@ -138,6 +140,10 @@ export function Options() {
         <div className="card-kicker">Notifications</div>
         <h2 id="notifications-heading">Alerts and previews</h2>
         {renderSettings(notificationSettings)}
+        <label className="setting-row badge-color-setting">
+          <span><strong>Notification count badge</strong><small>{state.settings.useGreenNotificationBadge ? 'Pushbullet green badge selected.' : 'Classic red badge selected.'}</small></span>
+          <span className="switch badge-color-switch"><input className="badge-color-input" type="checkbox" aria-label={state.settings.useGreenNotificationBadge ? 'Use classic red notification count badge' : 'Use Pushbullet green notification count badge'} checked={!state.settings.useGreenNotificationBadge} onChange={(event) => void updateSetting('useGreenNotificationBadge', !event.target.checked)} disabled={saving} /><span className="slider round badge-color-slider" /></span>
+        </label>
         <label className="setting-row">
           <span><strong>Notification duration</strong><small>Automatically clear alerts after a short delay.</small></span>
           <select value={state.settings.notificationDuration} onChange={(event) => void updateSetting('notificationDuration', Number(event.target.value))} disabled={saving}>

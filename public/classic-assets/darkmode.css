@@ -3,8 +3,11 @@ body.darkmode {
     background-color: #232a2a;
     scrollbar-color: #5c6868 #232a2a;
 }
+.darkmode * {
+    scrollbar-color: #5c6868 transparent;
+}
 .darkmode ::-webkit-scrollbar, .darkmode::-webkit-scrollbar {
-    background-color: #232a2a;
+    background-color: transparent;
 }
 .darkmode ::-webkit-scrollbar-thumb, .darkmode::-webkit-scrollbar-thumb {
     background-color: #5c6868;
@@ -35,13 +38,6 @@ body.darkmode {
 }
 .darkmode #notifications-holder {
     background-color: transparent;
-    scrollbar-color: #5c6868 #232a2a;
-}
-.darkmode #notifications-holder::-webkit-scrollbar {
-    background-color: #232a2a;
-}
-.darkmode #notifications-holder::-webkit-scrollbar-thumb {
-    border: 4px solid #232a2a;
 }
 .darkmode .stream-row.selected {
     background-color: rgba(255, 255, 255, 0.1);
@@ -152,7 +148,30 @@ body.darkmode {
 	background-color: #5c6868;
 }
 .darkmode .fake-notification {
+	color: #e9f1ee;
+	background-color: #2d3838;
+	border: 1px solid #5c6868;
     box-shadow: none;
+}
+.darkmode .fake-notification-close {
+	color: #a9bbb4;
+}
+.darkmode .fake-notification-close:hover,
+.darkmode .fake-notification-text-holder:hover,
+.darkmode .fake-notification-button:hover {
+	background-color: rgba(255, 255, 255, 0.08);
+}
+.darkmode .fake-notification-image-holder {
+	background-color: #232a2a;
+}
+.darkmode .fake-notification-context-message {
+	color: #a9bbb4;
+}
+.darkmode .fake-notification-bottom-border {
+	border-color: #5c6868;
+}
+.darkmode #notifications-empty-text {
+	color: #95a5a6;
 }
 .darkmode .drop-zone {
     background-color: rgba(255, 255, 255, 0.2);
@@ -180,6 +199,30 @@ body.darkmode {
 .darkmode #snooze-holder {
     color: #95a5a6;
 }
+.darkmode .notification-clear-all {
+    color: #d6e0dd;
+}
+.darkmode .notification-clear-all:hover:not(:disabled) {
+    border-color: #f08b7b;
+    color: #ffad9f;
+}
+.darkmode .fake-notification-button-icon {
+    filter: brightness(0) invert(1);
+}
 .darkmode #account-ribbon {
     background-image: url(ic_ribbon_darkmode.png);
+}
+.darkmode .large-upload-auth-notice {
+    border-color: #756b3d;
+    color: #f3e8bd;
+    background: #343a2e;
+}
+.darkmode .large-upload-auth-copy p {
+    color: #d2cca9;
+}
+.darkmode .large-upload-auth-actions a,
+.darkmode .large-upload-auth-actions button {
+    border-color: #978844;
+    color: #f3e8bd;
+    background: #414535;
 }

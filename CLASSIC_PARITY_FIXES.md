@@ -7,6 +7,7 @@ These fixes compare the component-based Classic panel with the active `366_0` pa
 - **History opens at the latest push and keeps loading older pushes.** The initial scroll could run before remote pushes, image sizes, or a hidden pop-out's final dimensions had settled. The panel now repeats the bottom scroll after layout, observes content/size changes, and preserves manual reading position. The first page includes up to 100 pushes; scrolling to the oldest visible items automatically requests the next API cursor page, without a “See full history” click.
 - **“See full history” stays in the pop-out.** The link is present as a website fallback and navigates the current panel window to the selected Pushbullet history route instead of opening another tab.
 - **Device rows show recent activity.** The “All devices” row and individual stream rows now display their latest push title, body, URL, or file name. Streams are ordered by newest activity, with streams that have no pushes ordered by name.
+- **Targeted pushes stay in the destination device stream.** A self-push sent from Chrome to a phone no longer appears as if it was delivered to Chrome; the “All devices” stream still retains the history entry.
 - **Long URLs fit the history bubble.** Bubbles are constrained to the available panel width and links can wrap instead of being clipped at the right edge.
 - **Message-body URLs are clickable.** HTTP and HTTPS URLs embedded in push body text render as safe external links.
 - **History restores previews and context.** Image pushes and image-file attachments render as thumbnails; messages are separated by legacy-style time dividers, the newest push gets a relative timestamp, and the end of each sender group shows its stream avatar.
@@ -16,10 +17,15 @@ These fixes compare the component-based Classic panel with the active `366_0` pa
 - **Legacy image metadata survives state migration.** Old snake_case image and file fields are normalized into the current push model.
 - **Profile avatars survive popup reopen.** Persisted camelCase user image URLs are now preserved when the worker normalizes stored account state.
 - **Options page restores legacy formatting and account status.** The Options-only header/avatar/ribbon sizing is loaded, and an authenticated account shows the configured-token placeholder and authenticated email.
+- **Classic notifications support dark mode.** Notification cards, close-button hover, image wells, separators, and the empty state now use the dark palette.
+- **Classic notification actions match the legacy cards.** Cards now show the mirrored app icon, Dismiss action, and eligible Mute/Unmute actions; clear-all can dismiss mirrored notifications on their source devices, controlled by a notification setting.
+- **Native mirror alerts use the pushed app icon.** Validated PNG, JPEG, GIF, and WebP payload icons are used in Windows notifications and the Reborn notification panel, with the Pushbullet icon as a safe fallback.
 - **Classic attachments send immediately.** Selecting or dropping a file starts the upload and sends it at once, matching the original panel; no second Send click is required. Push, SMS/MMS, and chat-pop-out paths use the same behavior.
+- **File pushes identify Chrome as their source.** Uploaded file push requests include the current Chrome device ID as `source_device_iden` while retaining the selected target, matching regular note/link pushes and the legacy worker.
 - **Uploads appear in chat as progress bubbles.** Push and MMS uploads show the selected file name and a progress bar in the message history while upload work is in progress.
 - **Upload chunks survive Chrome messaging serialization.** Chunks are sent as bounded base64 strings with byte lengths instead of `ArrayBuffer` values that Chrome may serialize as plain objects, which caused “Invalid upload message.”
 - **Signed uploads accept Pushbullet's `upload2` host.** The URL allowlist now includes `upload2.pushbullet.com`, verified against the legacy implementation's Pushbullet subdomain permissions.
+- **Pro-sized files use the legacy chunked upload protocol.** Files above the 25 MiB single-POST threshold use `/v3/start-upload`, sequential raw piece POSTs, and `/v3/finish-upload`. Both manifests request the Pushbullet `api_key` cookie for these requests and verify it belongs to the configured account.
 
 ## Verification
 

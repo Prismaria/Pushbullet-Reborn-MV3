@@ -1,15 +1,21 @@
 {
   "release": {
-    "title": "Pushbullet Reborn and Classic",
-    "notes_key": "current"
+    "title": "Pushbullet Reborn and Classic — Beta 5",
+    "notes_key": "beta-5",
+    "highlights": [
+      "Classic push history is more faithful and faster to restore, with correct device targeting, previews, links, and recent activity.",
+      "Mirrored notifications now support app icons and images, dark mode, mute and unmute controls, and source-device dismissal.",
+      "File transfers show live progress across push, chat, and SMS/MMS; Pro-size files use Pushbullet's chunked upload flow with clearer authentication recovery.",
+      "Pushes received during sleep or a connection gap now return as fresh native notifications after wake or reconnect."
+    ]
   },
   "reborn": {
     "name": "Pushbullet Reborn (MV3)",
-    "version": "0.1.1"
+    "version": "0.1.2"
   },
   "classic": {
     "name": "Pushbullet Classic",
-    "version": "367",
-    "version_name": "367 beta 2"
+    "version": "369",
+    "version_name": "369 beta 5"
   }
 }

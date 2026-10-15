@@ -1,4 +1,4 @@
-import { decodeUploadChunk, isUploadPortMessage, MAX_UPLOAD_BYTES, UPLOAD_CHUNK_BYTES, type UploadStart } from '../shared/uploads'
+import { decodeUploadChunk, formatUploadLimit, isUploadPortMessage, MAX_UPLOAD_BYTES, UPLOAD_CHUNK_BYTES, type UploadStart } from '../shared/uploads'
 import { uploadAndSendFile, uploadAndSendSms } from './uploads'
 
 function targetFromStart(start: UploadStart): UploadStart['target'] {
@@ -41,7 +41,7 @@ export function registerUploadPort(port: chrome.runtime.Port): void {
 
     if (value.type === 'start') {
       if (start || !Number.isInteger(value.size) || value.size < 1 || value.size > MAX_UPLOAD_BYTES) {
-        fail(`Files must be between 1 byte and ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB.`)
+        fail(`Files must be between 1 byte and ${formatUploadLimit(MAX_UPLOAD_BYTES)}.`)
         return
       }
       if (!value.fileName.trim() || value.fileName.length > 255 || value.mimeType.length > 128) {

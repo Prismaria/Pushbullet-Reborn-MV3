@@ -11,6 +11,13 @@ body {
     width: 630px;
     height: 471px;
 }
+#root {
+    height: 100%;
+}
+html.darkmode body {
+    color: #ecf0f0;
+    background-color: #232a2a;
+}
 body.popout {
     height: 100%;
     width: 100%;
@@ -65,9 +72,17 @@ body.popout {
     right: 40px;
     height: 48px;
     padding: 0 10px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
     color: #5c6868;
     line-height: 48px;
     text-align: center;
+}
+#snooze-holder:focus-visible {
+    outline: 2px solid #4ab367;
+    outline-offset: -2px;
 }
 #snooze-holder:hover {
     cursor: pointer;
@@ -169,18 +184,75 @@ body.popout {
     bottom: 0;
     background-color: #ecf0f0;
     overflow-y: scroll;
-    scrollbar-color: #cbd1d1 #fff;
+    overflow-x: hidden;
 }
-#notifications-holder::scrollbar {
-    background-color: #ecf0f0;
+.notification-list-toolbar {
+    position: absolute;
+    z-index: 2;
+    top: 4px;
+    right: 12px;
+    display: flex;
+    justify-content: flex-end;
+    width: 32px;
+    height: 38px;
 }
-#notifications-holder::scrollbar-thumb {
-    border: 4px solid #ecf0f0;
+.notification-clear-all {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+    place-items: center;
+    border: 0;
+    border-radius: 0;
+    color: #5c6868;
+    background: transparent;
+    cursor: pointer;
+}
+.notification-clear-all svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.2;
+}
+.notification-clear-all:hover:not(:disabled) {
+    color: #c4463a;
+    border-color: #c4463a;
+}
+.notification-clear-all:disabled {
+    cursor: default;
+    opacity: 0.4;
+}
+.notification-clear-all:focus-visible {
+    outline: 2px solid #4ab367;
+    outline-offset: 2px;
 }
 .fake-notification {
     max-width: 390px;
     margin: 15px auto;
     box-shadow: 0 1px 6px 0 rgba(0,0,0,0.3);
+}
+.notification-dismiss-wrap {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity 240ms ease, transform 240ms ease;
+}
+#notifications-holder.notifications-clearing .notification-dismiss-wrap {
+    opacity: 0;
+    transform: translateX(72px);
+    pointer-events: none;
+}
+#notifications-holder .notification-dismiss-wrap.notification-dismissing {
+    opacity: 0;
+    transform: translateX(72px);
+    pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .notification-dismiss-wrap {
+        transition-duration: 1ms;
+    }
 }
 #notifications-empty {
     width: 100%;

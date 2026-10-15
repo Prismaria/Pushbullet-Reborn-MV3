@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Pushbullet</title>
+    <script src="/classic-assets/panel-startup.js"></script>
+    <link rel="preload" href="/classic-assets/pushfont.woff" as="font" type="font/woff" crossorigin />
+    <link rel="preload" href="/classic-assets/icon.png" as="image" />
+    <link rel="preload" href="/classic-assets/chip_everything.png" as="image" />
+    <link rel="preload" href="/classic-assets/chip_person.png" as="image" />
     <link rel="stylesheet" href="/classic-assets/base.css" />
     <link rel="stylesheet" href="/classic-assets/picker.css" />
     <link rel="stylesheet" href="/classic-assets/dropzone.css" />
@@ -17,7 +22,28 @@
     <link rel="stylesheet" href="/classic-assets/auth-ui.css" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="container" class="classic-popup-shell" inert aria-busy="true" aria-label="Pushbullet">
+        <div id="content">
+          <div id="messaging-content" class="tab-content">
+            <div id="messaging-content-left">
+              <div class="stream-row selected"><img class="stream-row-image" src="/classic-assets/chip_everything.png" alt="" /><div class="stream-row-content">All devices</div></div>
+            </div>
+            <div id="messaging-content-right"><div id="push-right"><div id="push-right-top"></div><div id="push-right-bottom"><div id="push-send-holder"><i id="push-send-icon" class="pushfont-paperclip"></i></div><div style="margin-right:52px"><div id="push-add-link"><i class="pushfont-linkpip"></i></div><div id="push-input-holder"><textarea id="push-input" placeholder="Write a push..."></textarea></div></div></div></div></div>
+            <div id="messaging-top"><div id="push-top" style="height:100%"><div style="margin:0 120px;height:100%"><div class="tabs"><span id="friends-tab" class="tab top-tab">Friends</span><span id="me-tab" class="tab top-tab selected">Me</span><span id="following-tab" class="tab top-tab">Following</span></div></div></div></div>
+          </div>
+          <div style="position:absolute;top:6px;left:10px"><img src="/classic-assets/icon.png" height="36" width="36" alt="Pushbullet" /></div>
+        </div>
+        <div id="footer"><div style="margin:0 60px;height:100%"><div class="tabs">
+          <div id="pushing-tab" class="tab selected"><i class="tab-icon pushfont-bubble"></i><span class="tab-label">Pushing</span></div>
+          <div id="sms-tab" class="tab"><i class="tab-icon pushfont-message"></i><span class="tab-label">SMS</span></div>
+          <div id="notifications-tab" class="tab"><i class="tab-icon pushfont-bell"></i><span class="tab-label">Notifications</span></div>
+          <div id="account-tab" class="tab"><svg class="tab-icon account-tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" /></svg><span class="tab-label">Account</span></div>
+        </div></div></div>
+        <div id="popout-holder"><i class="pushfont-popout"></i></div>
+      </div>
+    </div>
+    <script src="/classic-assets/panel-shell.js"></script>
     <script type="module" src="/src/classic/panel/main.tsx"></script>
   </body>
 </html>

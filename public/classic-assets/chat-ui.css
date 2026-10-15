@@ -32,6 +32,51 @@
 .chat-cell .left:hover a {
     color: white;
 }
+.large-upload-auth-notice {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 11px;
+    border: 1px solid #d8c66f;
+    border-radius: 7px;
+    color: #39341e;
+    background: #fff8dc;
+    font: 12px Arial, sans-serif;
+}
+.large-upload-auth-copy strong {
+    display: block;
+    font-weight: bold;
+}
+.large-upload-auth-copy p {
+    margin: 4px 0 0;
+    line-height: 1.35;
+}
+.large-upload-auth-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+}
+.large-upload-auth-actions a,
+.large-upload-auth-actions button {
+    min-height: 29px;
+    padding: 0 8px;
+    border: 1px solid #b7a34f;
+    border-radius: 5px;
+    color: #39341e;
+    background: #fffdf3;
+    cursor: pointer;
+    font: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.large-upload-auth-actions button:disabled {
+    cursor: wait;
+    opacity: .65;
+}
 #chat-empty-state {
     height: 100%;
     display: flex;
@@ -168,6 +213,16 @@
 .chat-body {
     word-wrap: break-word;
     overflow-wrap: anywhere;
+}
+.chat-deduplicated-targets {
+    margin-top: 5px;
+    color: #657579;
+    font-size: 10px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+body.darkmode .chat-deduplicated-targets {
+    color: #d0d9d9;
 }
 .chat-url {
     display: block;

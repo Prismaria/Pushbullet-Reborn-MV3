@@ -24,6 +24,10 @@ function ClassicToggle({ id, labelId, descId, label, description, checked, onCha
   return <div className="option"><label className="option-label"><div className="switch"><input type="checkbox" id={id} checked={checked} onChange={(event) => onChange(event.target.checked)} disabled={disabled} /><span className="slider round" /></div><span id={labelId} className="option-title">{label}</span></label><div id={descId} className="option-desc">{description}</div></div>
 }
 
+function ClassicBadgeColorToggle({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
+  return <div className="option badge-color-option"><label className="option-label"><div className="switch badge-color-switch"><input className="badge-color-input" type="checkbox" aria-label={checked ? 'Use classic red notification count badge' : 'Use Pushbullet green notification count badge'} checked={!checked} onChange={(event) => onChange(!event.target.checked)} /><span className="slider round badge-color-slider" /></div><span className="option-title">Notification count badge</span></label><div className="option-desc">{checked ? 'Pushbullet green badge selected.' : 'Classic red badge selected.'}</div></div>
+}
+
 export function ClassicOptions() {
   const { state: loadedState, setState, loading } = useClassicState()
   const [contextMenusGranted, setContextMenusGranted] = useState(false)
@@ -72,9 +76,12 @@ export function ClassicOptions() {
           <ClassicToggle id="notification-count-checkbox" labelId="notification-count-label" descId="notification-count-desc" label="Notification count" description="Show the number of active notifications on the toolbar icon." checked={state.settings.showNotificationCount} onChange={(value) => void updateSetting('showNotificationCount', value)} />
           <ClassicToggle id="open-automatically-checkbox" labelId="open-automatically-label" descId="open-automatically-desc" label="Open links automatically" description="Open incoming links in a background tab." checked={state.settings.openMyLinksAutomatically} onChange={(value) => void updateSetting('openMyLinksAutomatically', value)} />
           <ClassicToggle id="auto-attach-link-checkbox" labelId="auto-attach-link-label" descId="auto-attach-link-desc" label="Attach current link" description="Start link pushes with the active tab." checked={state.settings.automaticallyAttachLink} onChange={(value) => void updateSetting('automaticallyAttachLink', value)} />
+          <ClassicToggle id="show-sent-pushes-checkbox" labelId="show-sent-pushes-label" descId="show-sent-pushes-desc" label="Show sent pushes in device history" description="On: show pushes in both sender and receiver device histories. Off: show them only in the receiver's history." checked={state.settings.showSentPushesInDeviceHistory} onChange={(value) => void updateSetting('showSentPushesInDeviceHistory', value)} />
         </div>
         <div id="category-notifications"><p id="heading-notifications" className="section-heading">Notifications</p>
           <ClassicToggle id="show-notifications-checkbox" labelId="show-notifications-label" descId="show-notifications-desc" label="Show notifications" description="Display mirrored notifications from your devices." checked={state.settings.showMirrors} onChange={(value) => void updateSetting('showMirrors', value)} />
+          <ClassicToggle id="clear-all-device-checkbox" labelId="clear-all-device-label" descId="clear-all-device-desc" label="Dismiss on devices when clearing all" description="Also dismiss mirrored notifications on their source devices." checked={state.settings.dismissMirrorsOnClearAll} onChange={(value) => void updateSetting('dismissMirrorsOnClearAll', value)} />
+          <ClassicBadgeColorToggle checked={state.settings.useGreenNotificationBadge} onChange={(value) => void updateSetting('useGreenNotificationBadge', value)} />
           <ClassicToggle id="titles-only-checkbox" labelId="titles-only-label" descId="titles-only-desc" label="Titles only" description="Keep notification previews compact." checked={state.settings.onlyShowTitles} onChange={(value) => void updateSetting('onlyShowTitles', value)} />
           <ClassicToggle id="play-sound-checkbox" labelId="play-sound-label" descId="play-sound-desc" label="Play sound" description="Play the Pushbullet notification sound." checked={state.settings.playSound} onChange={(value) => void updateSetting('playSound', value)} />
         </div>

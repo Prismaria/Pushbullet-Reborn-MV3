@@ -1,1 +1,1 @@
-export const CLASSIC_VERSION = '367 beta 2'
+export const CLASSIC_VERSION = '369 beta 5'

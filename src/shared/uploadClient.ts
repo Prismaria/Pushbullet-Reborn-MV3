@@ -1,7 +1,8 @@
 import type { ExtensionState, PushDraft, SmsSendDraft } from './models'
-import { encodeUploadChunk, MAX_UPLOAD_BYTES, UPLOAD_CHUNK_BYTES } from './uploads'
+import { encodeUploadChunk, formatUploadLimit, MAX_UPLOAD_BYTES, UPLOAD_CHUNK_BYTES } from './uploads'
 
 type UploadClientRequest = {
+  maxUploadBytes: number
   target: Pick<PushDraft, 'deviceIden' | 'email' | 'channelIden'>
   delivery?: 'push' | 'sms'
   sms?: Omit<SmsSendDraft, 'fileUrl' | 'fileType'>
@@ -13,7 +14,8 @@ export async function uploadFileThroughPort(
   onProgress: (loaded: number) => void,
   onCancelReady: (cancel: () => void) => void
 ): Promise<ExtensionState> {
-  if (file.size < 1 || file.size > MAX_UPLOAD_BYTES) throw new Error(`Files must be smaller than ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB.`)
+  const maxUploadBytes = Math.min(request.maxUploadBytes, MAX_UPLOAD_BYTES)
+  if (file.size < 1 || file.size > maxUploadBytes) throw new Error(`Files must be smaller than ${formatUploadLimit(maxUploadBytes)}.`)
 
   return new Promise<ExtensionState>((resolve, reject) => {
     const port = chrome.runtime.connect({ name: 'upload' })

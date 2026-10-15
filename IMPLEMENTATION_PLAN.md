@@ -157,7 +157,8 @@ Status: in progress
 - [x] Load Pushbullet history cursor pages as the user scrolls up, and keep the website fallback link in the current panel window.
 - [x] Skip automatic link attachment on non-web tabs without surfacing a composer error.
 - [ ] Match all legacy SMS pending/retry/MMS states and periodic refresh behavior.
-- [ ] Match mirrored notification images, mute/reply/Android actions, and source-device behavior.
+- [x] Match mirrored notification images, app mute/unmute controls, and source-device filtering.
+- [ ] Match mirrored quick-reply and Android action dispatch.
 - [ ] Complete an unpacked visual and interaction comparison against `366_0`.
 
 Screenshot-driven Classic panel fixes and their validation scope are recorded in `CLASSIC_PARITY_FIXES.md`.

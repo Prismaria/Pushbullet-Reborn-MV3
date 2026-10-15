@@ -10,6 +10,7 @@ type SubscriptionResponse = { subscriptions?: unknown[] }
 type PushResponse = { pushes?: unknown[]; cursor?: unknown }
 
 let refreshPromise: Promise<ExtensionState> | null = null
+let notifyForRefresh = false
 let historyPagePromise: Promise<ExtensionState> | null = null
 
 function record(value: unknown): Record<string, unknown> {
@@ -170,7 +171,11 @@ async function fetchOptional<T>(request: () => Promise<T>, label: string): Promi
 }
 
 export async function refreshRemoteState(options: { notify?: boolean } = {}): Promise<ExtensionState> {
-  if (refreshPromise) return refreshPromise
+  if (refreshPromise) {
+    notifyForRefresh ||= options.notify === true
+    return refreshPromise
+  }
+  notifyForRefresh = options.notify === true
   refreshPromise = (async () => {
     const current = await readState()
     const user = await apiRequest<Record<string, unknown>>('/v2/users/me')
@@ -205,6 +210,7 @@ export async function refreshRemoteState(options: { notify?: boolean } = {}): Pr
         name: stringValue(user.name),
          imageUrl: stringValue(user.image_url),
          pro: user.pro === true,
+         maxUploadSize: typeof user.max_upload_size === 'number' && Number.isSafeInteger(user.max_upload_size) && user.max_upload_size > 0 ? user.max_upload_size : undefined,
          replyCountQuota: typeof user.reply_count_quota === 'number' || typeof user.reply_count_quota === 'string' ? user.reply_count_quota : undefined
       },
       device,
@@ -225,13 +231,14 @@ export async function refreshRemoteState(options: { notify?: boolean } = {}): Pr
       connectionStatus: 'connected'
     }))
     await broadcastState(next)
-    if (options.notify) {
+    if (notifyForRefresh) {
       const newPushes = Object.values(next.pushes).filter((push) => !current.pushes[push.iden])
       await notifyForPushes(newPushes)
     }
     return next
   })().finally(() => {
     refreshPromise = null
+    notifyForRefresh = false
   })
   return refreshPromise
 }

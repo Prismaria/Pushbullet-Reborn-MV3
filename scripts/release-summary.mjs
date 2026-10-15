@@ -16,6 +16,12 @@ try {
 
 console.log(`# ${config.release.title}`)
 console.log('')
+if (Array.isArray(config.release.highlights) && config.release.highlights.length) {
+  console.log('## Highlights')
+  console.log('')
+  for (const highlight of config.release.highlights) console.log(`- ${highlight}`)
+  console.log('')
+}
 console.log(`Source commit: \`${commit}\``)
 console.log('')
 console.log('| Pipeline | Manifest version | Artifact |')

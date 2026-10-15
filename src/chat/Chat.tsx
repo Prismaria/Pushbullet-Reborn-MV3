@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { sendExtensionMessage } from '../shared/messages'
+import { LargeUploadAuthNotice } from '../shared/LargeUploadAuthNotice'
 import type { Chat as ChatContact, ExtensionState, SmsMessage, SmsThread } from '../shared/models'
 import { uploadFileThroughPort } from '../shared/uploadClient'
-import { MAX_UPLOAD_BYTES } from '../shared/uploads'
+import { formatUploadLimit, maxUploadBytesForUser, MAX_UPLOAD_BYTES } from '../shared/uploads'
 import { useExtensionState } from '../shared/useExtensionState'
 
 const params = new URLSearchParams(location.search)
@@ -66,10 +67,11 @@ type ChatComposerProps = {
   fileTarget: { deviceIden?: string; email?: string }
   sms?: { deviceIden: string; addresses: string[] }
   smsAttachmentsAllowed?: boolean
+  maxUploadBytes: number
   onSent: (state: ExtensionState) => void
 }
 
-function ChatComposer({ disabled, placeholder, fileTarget, sms, smsAttachmentsAllowed = true, onSent }: ChatComposerProps) {
+function ChatComposer({ disabled, placeholder, fileTarget, sms, smsAttachmentsAllowed = true, maxUploadBytes, onSent }: ChatComposerProps) {
   const [body, setBody] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState('')
@@ -82,8 +84,9 @@ function ChatComposer({ disabled, placeholder, fileTarget, sms, smsAttachmentsAl
       setStatus('This device does not support MMS attachments.')
       return
     }
-    if (nextFile.size > MAX_UPLOAD_BYTES) {
-      setStatus(`Files must be smaller than ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB.`)
+    const limit = Math.min(maxUploadBytes, MAX_UPLOAD_BYTES)
+    if (nextFile.size < 1 || nextFile.size > limit) {
+      setStatus(`Files must be smaller than ${formatUploadLimit(limit)}.`)
       return
     }
     setFile(nextFile)
@@ -104,6 +107,7 @@ function ChatComposer({ disabled, placeholder, fileTarget, sms, smsAttachmentsAl
     try {
       if (file) {
         const state = await uploadFileThroughPort(file, {
+          maxUploadBytes,
           target: fileTarget,
           delivery: sms ? 'sms' : 'push',
           sms: sms ? { deviceIden: sms.deviceIden, addresses: sms.addresses, body: body.trim() || undefined } : undefined
@@ -271,6 +275,7 @@ export function Chat() {
         </div>
         <button className="small-button" type="button" onClick={() => window.close()}>Close</button>
       </header>
+      <LargeUploadAuthNotice user={state.user} />
 
       {mode === 'push' && (
         <label className="chat-picker-label">Conversation
@@ -316,6 +321,7 @@ export function Chat() {
         fileTarget={mode === 'sms' ? { deviceIden } : { email: targetEmail }}
         sms={mode === 'sms' && deviceIden && smsAddresses.length ? { deviceIden, addresses: smsAddresses } : undefined}
         smsAttachmentsAllowed={mode !== 'sms' || device?.hasMms === true}
+        maxUploadBytes={maxUploadBytesForUser(state.user)}
         onSent={(nextState) => {
           setState(nextState)
           if (mode === 'sms' && deviceIden && threadId) {

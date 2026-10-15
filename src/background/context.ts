@@ -51,6 +51,12 @@ export async function setupContextMenus(): Promise<void> {
   for (const device of Object.values(state.devices)) {
     if (device.active === false || device.pushable === false) continue
     chrome.contextMenus.create({
+      id: menuTargetId('pushbullet-link-device-', device.iden),
+      parentId: 'pushbullet-link',
+      title: device.nickname || device.model || device.iden,
+      contexts: ['link']
+    })
+    chrome.contextMenus.create({
       id: menuTargetId('pushbullet-device-', device.iden),
       parentId: 'pushbullet-page',
       title: device.nickname || device.model || device.iden,
@@ -71,15 +77,18 @@ export async function setupContextMenus(): Promise<void> {
 
 async function handleContextMenu(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab): Promise<void> {
   const deviceIden = readMenuTarget(String(info.menuItemId), 'pushbullet-device-')
+  const linkDeviceIden = readMenuTarget(String(info.menuItemId), 'pushbullet-link-device-')
   const email = readMenuTarget(String(info.menuItemId), 'pushbullet-person-')
   if (info.menuItemId === 'pushbullet-selection') {
     await sendPush({ type: 'note', body: info.selectionText || '' })
     await showContextFeedback('Selected text sent.')
     return
   }
-  if (info.menuItemId === 'pushbullet-link') {
-    await sendPush({ type: 'link', url: info.linkUrl || '', title: tab?.title })
-    await showContextFeedback('Link sent.')
+  if (linkDeviceIden) {
+    const state = await readState()
+    const device = state.devices[linkDeviceIden]
+    await sendPush({ type: 'link', url: info.linkUrl || '', title: tab?.title, deviceIden: linkDeviceIden })
+    await showContextFeedback(`Link sent to ${device?.nickname || device?.model || device?.iden || 'device'}.`)
     return
   }
   if (info.menuItemId === 'pushbullet-page' || deviceIden || email) {

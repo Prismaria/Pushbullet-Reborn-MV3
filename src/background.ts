@@ -3,12 +3,12 @@ import {
   type ExtensionMessage,
   type ExtensionResponse
 } from './shared/messages'
-import { ApiError, validateToken } from './background/api'
+import { ApiError, hasLegacyUploadAuthForCurrentUser, validateToken } from './background/api'
 import { clearToken, readState, readToken, updateState, writeState, writeToken } from './background/state'
 import { broadcastState } from './background/events'
 import { connectWebSocket, disconnectWebSocket, handleAlarm, handleIdleState, initializeConnection } from './background/connection'
 import { loadMorePushHistory, refreshRemoteState } from './background/remote'
-import { clearNativeNotifications, dismissNotification, refreshNotificationBadge, registerNotificationListeners } from './background/notifications'
+import { clearAllNotifications, clearNativeNotifications, clearNotification, dismissNotification, muteNotification, refreshNotificationBadge, registerNotificationListeners, unmuteNotification } from './background/notifications'
 import { registerUploadPort } from './background/upload-port'
 import { clearActiveChat, getPhonebook, getSmsThread, getSmsThreads, sendSms, setActiveChat } from './background/sms'
 import { handleCommand, registerContextMenuEvents, setupContextMenus } from './background/context'
@@ -129,6 +129,8 @@ async function handleMessage(message: ExtensionMessage): Promise<ExtensionRespon
       return { ok: true, service: 'background' }
     case 'get_state':
       return { ok: true, state: await readState() }
+    case 'get_large_upload_auth':
+      return { ok: true, available: await hasLegacyUploadAuthForCurrentUser() }
     case 'set_token':
       return { ok: true, state: await setToken(message.token) }
     case 'sign_out':
@@ -145,6 +147,18 @@ async function handleMessage(message: ExtensionMessage): Promise<ExtensionRespon
     }
     case 'dismiss_notification':
       await dismissNotification(message.key)
+      return { ok: true, state: await readState() }
+    case 'clear_notification':
+      await clearNotification(message.key)
+      return { ok: true, state: await readState() }
+    case 'clear_all_notifications':
+      await clearAllNotifications()
+      return { ok: true, state: await readState() }
+    case 'mute_notification':
+      await muteNotification(message.key)
+      return { ok: true, state: await readState() }
+    case 'unmute_notification':
+      await unmuteNotification(message.key)
       return { ok: true, state: await readState() }
     case 'set_snooze':
       return { ok: true, state: await setSnooze(message.enabled) }

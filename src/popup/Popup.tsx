@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import { AuthCard } from '../shared/AuthCard'
+import { LargeUploadAuthNotice } from '../shared/LargeUploadAuthNotice'
 import { sendExtensionMessage } from '../shared/messages'
+import { mirrorIconDataUrl } from '../shared/mirror-images'
+import type { NotificationRecord } from '../shared/models'
 import { useExtensionState } from '../shared/useExtensionState'
+import { maxUploadBytesForUser } from '../shared/uploads'
 import { getStreamTargets, StreamList, type PopupMode, type StreamTarget } from './StreamList'
 import { PushComposer } from './PushComposer'
 import type { Push } from '../shared/models'
+import { pushMatchesDevice } from '../shared/push-history'
 
-function pushMatchesTarget(push: Push, target: StreamTarget | null): boolean {
+function pushMatchesTarget(push: Push, target: StreamTarget | null, showSentPushes = true): boolean {
   if (!target || target.id === '*') return true
-  if (target.deviceIden) return push.targetDeviceIden === target.deviceIden || push.sourceDeviceIden === target.deviceIden
+  if (target.deviceIden) return pushMatchesDevice(push, target.deviceIden, showSentPushes)
   if (target.email) return push.senderEmailNormalized === target.email || push.receiverEmailNormalized === target.email
   if (target.channelIden) return push.channelTag === target.channelIden
   return true
@@ -50,7 +55,7 @@ export function Popup() {
   const targets = getStreamTargets(state, mode)
   const target = targets.find((item) => item.id === selectedId) || targets[0] || null
   const pushes = Object.values(state.pushes)
-    .filter((push) => pushMatchesTarget(push, target))
+    .filter((push) => pushMatchesTarget(push, target, state.settings.showSentPushesInDeviceHistory))
     .sort((first, second) => (second.modified || second.created || 0) - (first.modified || first.created || 0))
     .slice(0, 20)
   const notifications = Object.values(state.notifications).sort((first, second) => second.createdAt - first.createdAt)
@@ -80,6 +85,53 @@ export function Popup() {
       if (response.ok) setState(response.state)
     } catch (caughtError) {
       console.warn('Could not dismiss notification:', caughtError)
+    }
+  }
+
+  const clear = async (key: string) => {
+    try {
+      const response = await sendExtensionMessage({ type: 'clear_notification', key })
+      if (response.ok) setState(response.state)
+    } catch (caughtError) {
+      console.warn('Could not clear notification:', caughtError)
+    }
+  }
+
+  const clearAll = async () => {
+    try {
+      const response = await sendExtensionMessage({ type: 'clear_all_notifications' })
+      if (response.ok) setState(response.state)
+    } catch (caughtError) {
+      console.warn('Could not clear notifications:', caughtError)
+    }
+  }
+
+  const openNotification = async (notification: NotificationRecord) => {
+    if (notification.kind === 'mute_confirmation') {
+      await clear(notification.key)
+      return
+    }
+    if (notification.url) await chrome.tabs.create({ url: notification.url, active: true })
+    else if (notification.chatEmail) await chrome.windows.create({ url: chrome.runtime.getURL(`chat.html?mode=push&target=${encodeURIComponent(notification.chatEmail)}`), type: 'popup', width: 630, height: 520 })
+    await dismiss(notification.key)
+  }
+
+  const runNotificationAction = async (notification: NotificationRecord, actionId: string) => {
+    if (actionId.startsWith('open_')) {
+      await openNotification(notification)
+      return
+    }
+    try {
+      const response = actionId.startsWith('mute_')
+        ? await sendExtensionMessage({ type: 'mute_notification', key: notification.key })
+        : actionId.startsWith('unmute_')
+          ? await sendExtensionMessage({ type: 'unmute_notification', key: notification.key })
+          : actionId.startsWith('dismiss_')
+            ? await sendExtensionMessage({ type: 'dismiss_notification', key: notification.key })
+            : await sendExtensionMessage({ type: 'clear_notification', key: notification.key })
+      if (response.ok) setState(response.state)
+    } catch (caughtError) {
+      console.warn('Could not run notification action:', caughtError)
     }
   }
 
@@ -129,6 +181,7 @@ export function Popup() {
           <button className="icon-button" type="button" onClick={() => void signOut()} aria-label="Disconnect">×</button>
         </div>
       </header>
+      <LargeUploadAuthNotice user={state.user} />
 
       <nav className="mode-tabs" aria-label="Push streams">
         {(['friends', 'me', 'following', 'sms'] as PopupMode[]).map((item) => (
@@ -145,20 +198,31 @@ export function Popup() {
         </aside>
         <section className="chat-panel">
           {notifications.length > 0 && (
-            <section className="notification-panel">
+            <section className="notification-panel" aria-labelledby="notifications-heading">
               <div className="notification-heading">
-                <div className="panel-label">Notifications</div>
-                <span className="notification-count">{notifications.length}</span>
-              </div>
-              {notifications.slice(0, 3).map((notification) => (
-                <div className="notification-row" key={notification.key}>
-                  <div>
-                    <strong>{notification.title}</strong>
-                    <p>{notification.message}</p>
-                  </div>
-                  <button className="dismiss-button" type="button" onClick={() => void dismiss(notification.key)}>Dismiss</button>
+                <div id="notifications-heading" className="panel-label">Notifications</div>
+                <div className="notification-heading-actions">
+                  <span className="notification-count">{notifications.length}</span>
+                  <button className="icon-button notification-clear-button" type="button" onClick={() => void clearAll()} aria-label="Clear all notifications" title="Clear all notifications">×</button>
                 </div>
-              ))}
+              </div>
+              <div className="notification-list" role="list">
+                {notifications.map((notification) => {
+                  const buttons = notification.buttons?.length ? notification.buttons : [{ title: 'Dismiss', actionId: `dismiss_${notification.key}` }]
+                  return <article className="notification-row" key={notification.key} role="listitem">
+                    <img className="notification-image" src={mirrorIconDataUrl(notification.mirror?.icon) || chrome.runtime.getURL('icon_48.png')} alt="" onError={(event) => { event.currentTarget.src = chrome.runtime.getURL('icon_48.png') }} />
+                    <div className="notification-copy">
+                      <button className="notification-content" type="button" onClick={() => void openNotification(notification)}>
+                        <strong>{notification.title}</strong>
+                        <p>{notification.message || 'App notifications are muted.'}</p>
+                      </button>
+                      <div className="notification-actions">
+                         {buttons.map((button) => <button className="dismiss-button" type="button" key={button.actionId} onClick={() => void runNotificationAction(notification, button.actionId)}>{button.title}</button>)}
+                      </div>
+                    </div>
+                  </article>
+                })}
+              </div>
             </section>
           )}
           <div className="history-panel">
@@ -180,7 +244,7 @@ export function Popup() {
               <p className="auth-copy">Open the SMS window to browse threads, reply, and attach MMS files.</p>
               <button className="primary-button" type="button" onClick={openSmsChat} disabled={!target}>Open SMS</button>
             </section>
-          ) : <PushComposer target={target} automaticallyAttachLink={state.settings.automaticallyAttachLink} onStateChange={setState} />}
+          ) : <PushComposer target={target} automaticallyAttachLink={state.settings.automaticallyAttachLink} maxUploadBytes={maxUploadBytesForUser(state.user)} onStateChange={setState} />}
         </section>
       </div>
     </main>

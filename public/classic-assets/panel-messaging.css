@@ -52,3 +52,71 @@
     margin-top: 2px;
     vertical-align: middle;
 }
+.classic-device-context-menu {
+    position: fixed;
+    z-index: 1000;
+    min-width: 184px;
+    padding: 4px;
+    border: 1px solid #d8dddd;
+    border-radius: 5px;
+    color: #263238;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.24);
+}
+.classic-device-context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 34px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: 3px;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    white-space: nowrap;
+}
+.classic-device-context-menu-item:hover,
+.classic-device-context-menu-item:focus-visible {
+    outline: none;
+    background: #edf3f0;
+}
+.classic-device-context-menu-item svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+.classic-device-copy-toast {
+    position: fixed;
+    z-index: 1001;
+    right: 12px;
+    bottom: 60px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    color: #fff;
+    background: #263238;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+    font-size: 12px;
+}
+body.darkmode .classic-device-context-menu {
+    border-color: #566364;
+    color: #f2f5f5;
+    background: #303a3d;
+}
+body.darkmode .classic-device-context-menu-item:hover,
+body.darkmode .classic-device-context-menu-item:focus-visible {
+    background: #465255;
+}
+body.darkmode .classic-device-copy-toast {
+    color: #f2f5f5;
+    background: #3e494d;
+}

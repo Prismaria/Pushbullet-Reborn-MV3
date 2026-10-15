@@ -8,6 +8,11 @@ let socket: WebSocket | null = null
 let generation = 0
 let connectionPromise: Promise<void> | null = null
 
+async function hasPushHistoryBaseline(): Promise<boolean> {
+  const state = await readState()
+  return state.pushHistoryLoadedPages > 0 || Object.keys(state.pushes).length > 0
+}
+
 export async function disconnectWebSocket(): Promise<void> {
   generation += 1
   if (socket) socket.close(1000, 'signed out')
@@ -39,7 +44,7 @@ async function connectWebSocketInternal(): Promise<void> {
       await setConnectionStatus('connected')
       await chrome.storage.local.set({ reconnectAttempts: 0 })
       try {
-        await refreshRemoteState({ notify: false })
+        await refreshRemoteState({ notify: true })
       } catch (error) {
         console.warn('Could not refresh state after connecting:', error)
       }
@@ -56,7 +61,12 @@ async function connectWebSocketInternal(): Promise<void> {
           const push = message.push
           const currentDeviceIden = (await readState()).device?.iden
           if (currentDeviceIden && (push.source_device_iden === currentDeviceIden || (push.target_device_iden && push.target_device_iden !== currentDeviceIden))) return
-          await clearNotification(`mirror_${mirrorIdentity({ packageName: push.package_name, notificationId: push.notification_id, notificationTag: push.notification_tag, conversationIden: push.conversation_iden }, push.iden)}`)
+          const state = await readState()
+          const identity = mirrorIdentity({ packageName: push.package_name, notificationId: push.notification_id, notificationTag: push.notification_tag, conversationIden: push.conversation_iden })
+          const key = `mirror_${identity}`
+          const existingKey = Object.entries(state.notifications).find(([notificationKey, notification]) => notificationKey === key
+            || (notification.mirror && mirrorIdentity(notification.mirror) === identity))?.[0]
+          await clearNotification(existingKey || key)
         } else if (message.type === 'push' && message.push) {
           const currentDeviceIden = (await readState()).device?.iden
           if (currentDeviceIden && (message.push.source_device_iden === currentDeviceIden || (message.push.target_device_iden && message.push.target_device_iden !== currentDeviceIden))) return
@@ -95,7 +105,7 @@ export async function initializeConnection(): Promise<void> {
   }
   if (!await readToken()) return
   try {
-    await refreshRemoteState({ notify: false })
+    await refreshRemoteState({ notify: await hasPushHistoryBaseline() })
     await connectWebSocket()
   } catch (error) {
     console.warn('Pushbullet connection initialization failed:', error)
@@ -123,6 +133,10 @@ export function handleIdleState(state: string): void {
   if (state === 'locked') {
     void disconnectWebSocket()
   } else if (state === 'active') {
-    void connectWebSocket()
+    void (async () => {
+      if (!await readToken()) return
+      await refreshRemoteState({ notify: await hasPushHistoryBaseline() })
+      await connectWebSocket()
+    })().catch((error) => console.warn('Could not refresh Pushbullet state after waking:', error))
   }
 }

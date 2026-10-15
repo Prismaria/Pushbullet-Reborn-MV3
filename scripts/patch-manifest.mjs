@@ -40,5 +40,8 @@ if (pipeline === 'classic') {
   delete manifest.version_name
 }
 
+if (!manifest.permissions.includes('cookies')) manifest.permissions.push('cookies')
+if (!manifest.host_permissions.includes('https://www.pushbullet.com/*')) manifest.host_permissions.push('https://www.pushbullet.com/*')
+
 await writeFile(file, `${JSON.stringify(manifest, null, 2)}\n`)
 console.log(`Patched ${pipeline} manifest to ${manifest.version}${manifest.version_name ? ` (${manifest.version_name})` : ''}.`)

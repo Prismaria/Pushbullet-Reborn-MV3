@@ -62,6 +62,7 @@ The Reborn and Classic ZIPs are separate extensions. Load only the variant you w
 - `storage`, `alarms`, `idle`, `notifications`, `offscreen`, `activeTab`, and `tabs` are required by the migrated worker and UI. `tabs` is used only to read the active tab URL/title for explicit push actions.
 - `https://api.pushbullet.com/*` is used for authenticated API calls.
 - Pushbullet signed file-upload URLs may use `upload.pushbullet.com`, its upload subdomains, or `upload2.pushbullet.com`.
+- Both builds request `cookies` and `https://www.pushbullet.com/*` to read the signed-in account's `api_key` cookie for legacy chunked large-file uploads. The configured access token remains the normal API credential; the cookie is used only for the legacy large-upload start/finish requests and is not persisted.
 - `contextMenus` is optional and is requested only when enabled from Settings.
 
 Access tokens are validated and stored by the worker. UI code never calls Pushbullet directly. See `ADVANCED_FEATURES.md` for encryption, mirror, channel, and permission decisions.

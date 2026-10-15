@@ -1,8 +1,10 @@
 import { useEffect, useState, type DragEvent } from 'react'
 import { sendExtensionMessage } from '../shared/messages'
+import { LargeUploadAuthNotice } from '../shared/LargeUploadAuthNotice'
 import type { ExtensionState, Push, SmsMessage, SmsThread } from '../shared/models'
 import { uploadFileThroughPort } from '../shared/uploadClient'
-import { MAX_UPLOAD_BYTES } from '../shared/uploads'
+import { formatUploadLimit, maxUploadBytesForUser } from '../shared/uploads'
+import { validateHttpUrl } from '../shared/validation'
 import { ClassicUploadProgressBubble, type ClassicUploadProgress } from './ClassicUploadProgressBubble'
 import { useClassicState } from './useClassicState'
 
@@ -17,12 +19,17 @@ function asset(name: string): string {
 }
 
 function ClassicChatHistory({ pushes, messages, sms, uploadProgress }: { pushes: Push[]; messages: SmsMessage[]; sms: boolean; uploadProgress: ClassicUploadProgress | null }) {
-  type ChatItem = { id: string; body?: string; title?: string; url?: string; fileUrl?: string; direction?: string }
+  type ChatItem = { id: string; body?: string; title?: string; url?: string; fileUrl?: string; fileType?: string; imageUrl?: string; direction?: string }
   const values: ChatItem[] = sms
-    ? messages.map((message, index) => ({ id: message.iden || message.guid || String(index), body: message.body, direction: message.direction, fileUrl: message.fileUrl }))
-    : pushes.map((push) => ({ id: push.iden, body: push.body, title: push.title, url: push.url, fileUrl: push.fileUrl, direction: push.direction }))
+    ? messages.map((message, index) => ({ id: message.iden || message.guid || String(index), body: message.body, direction: message.direction, fileUrl: message.fileUrl, fileType: message.fileType, imageUrl: message.fileType?.startsWith('image/') ? message.fileUrl : undefined }))
+    : pushes.map((push) => ({ id: push.iden, body: push.body, title: push.title, url: push.url, fileUrl: push.fileUrl, fileType: push.fileType, imageUrl: push.imageUrl || (push.fileType?.startsWith('image/') ? push.fileUrl : undefined), direction: push.direction }))
   if (!values.length && !uploadProgress) return <div id="chat-empty-state"><div><img src={asset('bg_sam.png')} alt="" /><p>No messages yet.</p></div></div>
-  return <>{values.map((message) => <div className={`chat-row${message.direction === 'incoming' ? ' incoming' : ' outgoing'}`} key={message.id}><div className={`chat-bubble${message.direction === 'incoming' ? ' left' : ''}${sms && message.direction === 'incoming' ? ' sms' : ''}`}><div className="chat-bubble-contents">{message.title && <div className="chat-title">{message.title}</div>}{message.body && <div className="chat-body">{message.body}</div>}{message.url && <a className="chat-url" href={message.url} target="_blank" rel="noreferrer">{message.url}</a>}{message.fileUrl && <a className="chat-url" href={message.fileUrl} target="_blank" rel="noreferrer">Open attachment</a>}</div></div></div>)}{uploadProgress && <ClassicUploadProgressBubble upload={uploadProgress} />}</>
+  return <>{values.map((message) => {
+    const imageUrl = message.imageUrl || (message.fileType?.startsWith('image/') ? message.fileUrl : undefined)
+    const imageHref = validateHttpUrl(message.fileUrl || '') || validateHttpUrl(imageUrl || '')
+    const image = imageUrl && <img className="chat-image" src={imageUrl} alt={message.title || 'Message attachment'} onError={(event) => { event.currentTarget.style.display = 'none' }} />
+    return <div className={`chat-row${message.direction === 'incoming' ? ' incoming' : ' outgoing'}`} key={message.id}><div className={`chat-bubble${message.direction === 'incoming' ? ' left' : ''}${sms && message.direction === 'incoming' ? ' sms' : ''}`}><div className="chat-bubble-contents">{message.title && <div className="chat-title">{message.title}</div>}{message.body && <div className="chat-body">{message.body}</div>}{image && (imageHref ? <a href={imageHref} target="_blank" rel="noreferrer">{image}</a> : image)}{!image && message.url && <a className="chat-url" href={message.url} target="_blank" rel="noreferrer">{message.url}</a>}{!image && message.fileUrl && <a className="chat-url" href={message.fileUrl} target="_blank" rel="noreferrer">Open attachment</a>}</div></div></div>
+  })}{uploadProgress && <ClassicUploadProgressBubble upload={uploadProgress} />}</>
 }
 
 export function ClassicChatWindow() {
@@ -80,6 +87,7 @@ export function ClassicChatWindow() {
   if (loading && !loadedState) return <div id="chat-holder" />
   if (!loadedState || !loadedState.user) return <div id="chat-holder"><div id="messaging-banner">Sign in to Pushbullet before opening a chat.</div></div>
   const state = loadedState
+  const maxUploadBytes = maxUploadBytesForUser(state.user)
   const contact = Object.values(state.chats).find((chat) => chat.with?.emailNormalized === targetEmail)
   const device = deviceIden ? state.devices[deviceIden] : undefined
   const thread = threads.find((item) => item.id === threadId)
@@ -87,7 +95,11 @@ export function ClassicChatWindow() {
   const recipients = thread?.recipients.map((recipient) => recipient.address) || []
 
   const chooseFile = async (file: File | undefined) => {
-    if (!file || busy || file.size < 1 || file.size > MAX_UPLOAD_BYTES) return
+    if (!file || busy) return
+    if (file.size < 1 || file.size > maxUploadBytes) {
+      setStatus(`Files must be smaller than ${formatUploadLimit(maxUploadBytes)}.`)
+      return
+    }
     if (mode === 'sms') {
       if (!deviceIden || !recipients.length || device?.hasMms !== true) {
         setStatus('This device does not support MMS attachments.')
@@ -100,8 +112,8 @@ export function ClassicChatWindow() {
     setUploadProgress({ fileName: file.name, progress: 0 })
     try {
       const nextState = mode === 'sms'
-        ? await uploadFileThroughPort(file, { delivery: 'sms', target: { deviceIden }, sms: { deviceIden, addresses: recipients, body: body.trim() || undefined } }, (progress) => { setStatus(`${progress}%`); setUploadProgress({ fileName: file.name, progress }) }, (cancel) => setCancelUpload(() => cancel))
-        : await uploadFileThroughPort(file, { target: { email: targetEmail } }, (progress) => { setStatus(`${progress}%`); setUploadProgress({ fileName: file.name, progress }) }, (cancel) => setCancelUpload(() => cancel))
+        ? await uploadFileThroughPort(file, { maxUploadBytes, delivery: 'sms', target: { deviceIden }, sms: { deviceIden, addresses: recipients, body: body.trim() || undefined } }, (progress) => { setStatus(`${progress}%`); setUploadProgress({ fileName: file.name, progress }) }, (cancel) => setCancelUpload(() => cancel))
+        : await uploadFileThroughPort(file, { maxUploadBytes, target: { email: targetEmail } }, (progress) => { setStatus(`${progress}%`); setUploadProgress({ fileName: file.name, progress }) }, (cancel) => setCancelUpload(() => cancel))
       setState(nextState)
       setBody('')
       setStatus('Attachment sent.')
@@ -153,7 +165,7 @@ export function ClassicChatWindow() {
       <div id="chat-holder">
         <div id="push-chat-scroll" className="chat-scroll" style={{ display: mode === 'push' ? 'block' : 'none' }}><div id="push-chat-table" className="chat-table"><div id="push-chat-cell" className="chat-cell"><ClassicChatHistory pushes={pushes} messages={[]} sms={false} uploadProgress={uploadProgress} /></div></div></div>
         <div id="sms-chat-scroll" className="chat-scroll" style={{ display: mode === 'sms' ? 'block' : 'none' }}><div id="sms-chat-table" className="chat-table"><div id="sms-chat-cell" className="chat-cell"><ClassicChatHistory pushes={[]} messages={messages} sms uploadProgress={uploadProgress} /></div></div></div>
-        <div id="messaging-banner" />
+        <div id="messaging-banner"><LargeUploadAuthNotice user={state.user} className="classic-large-upload-auth-notice" /></div>
       </div>
       <div id="top">
         <div id="picker-holder" style={{ display: mode === 'push' ? 'block' : 'none' }}><input id="chat-target" className="picker-input" type="text" value={contact?.with?.name || targetEmail} onChange={(event) => setTargetEmail(event.target.value)} list="classic-chat-targets" /><datalist id="classic-chat-targets">{Object.values(state.chats).map((chat) => <option key={chat.iden} value={chat.with?.emailNormalized || ''}>{chat.with?.name}</option>)}</datalist><div id="chat-picker" className="picker" /><div id="chat-overlay" className="picker-overlay" /></div>

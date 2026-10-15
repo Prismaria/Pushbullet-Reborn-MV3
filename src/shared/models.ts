@@ -10,6 +10,7 @@ export type ExtensionUser = {
   imageUrl?: string
   pro?: boolean
   replyCountQuota?: number | string
+  maxUploadSize?: number
 } | null
 
 export type Device = {
@@ -118,6 +119,7 @@ export type NotificationRecord = {
   key: string
   title: string
   message: string
+  kind?: 'notification' | 'mute_confirmation'
   pushIden?: string
   chatEmail?: string
   url?: string
@@ -161,6 +163,8 @@ export type ExtensionSettings = {
   useDarkIcon: boolean
   playSound: boolean
   showMirrors: boolean
+  dismissMirrorsOnClearAll: boolean
+  useGreenNotificationBadge: boolean
   showContextMenu: boolean
   notificationDuration: number
   snoozedUntil: number
@@ -169,6 +173,7 @@ export type ExtensionSettings = {
   allowInstantPush: boolean
   instantPushIden: string
   automaticallyAttachLink: boolean
+  showSentPushesInDeviceHistory: boolean
   disableAnalytics: boolean
   needsDataApproval: boolean
 }
@@ -201,6 +206,8 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   useDarkIcon: false,
   playSound: true,
   showMirrors: true,
+  dismissMirrorsOnClearAll: true,
+  useGreenNotificationBadge: false,
   showContextMenu: true,
   notificationDuration: 0,
   snoozedUntil: 0,
@@ -209,6 +216,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   allowInstantPush: false,
   instantPushIden: '*',
   automaticallyAttachLink: true,
+  showSentPushesInDeviceHistory: true,
   disableAnalytics: false,
   needsDataApproval: false
 }

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { sendExtensionMessage } from '../shared/messages'
 import type { ExtensionState } from '../shared/models'
-import { MAX_UPLOAD_BYTES } from '../shared/uploads'
+import { formatUploadLimit, MAX_UPLOAD_BYTES } from '../shared/uploads'
 import { uploadFileThroughPort } from '../shared/uploadClient'
 import type { StreamTarget } from './StreamList'
 
 type PushComposerProps = {
   target: StreamTarget | null
   automaticallyAttachLink: boolean
+  maxUploadBytes: number
   onStateChange: (state: ExtensionState) => void
 }
 
@@ -16,7 +17,7 @@ async function getActiveTab(): Promise<chrome.tabs.Tab | null> {
   return tabs[0] || null
 }
 
-export function PushComposer({ target, automaticallyAttachLink, onStateChange }: PushComposerProps) {
+export function PushComposer({ target, automaticallyAttachLink, maxUploadBytes, onStateChange }: PushComposerProps) {
   const [mode, setMode] = useState<'note' | 'link'>('note')
   const [body, setBody] = useState('')
   const [title, setTitle] = useState('')
@@ -29,8 +30,9 @@ export function PushComposer({ target, automaticallyAttachLink, onStateChange }:
 
   const chooseFile = (file: File | undefined) => {
     if (!file) return
-    if (file.size < 1 || file.size > MAX_UPLOAD_BYTES) {
-      setStatus(`Files must be smaller than ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB.`)
+    const limit = Math.min(maxUploadBytes, MAX_UPLOAD_BYTES)
+    if (file.size < 1 || file.size > limit) {
+      setStatus(`Files must be smaller than ${formatUploadLimit(limit)}.`)
       return
     }
     setSelectedFile(file)
@@ -90,6 +92,7 @@ export function PushComposer({ target, automaticallyAttachLink, onStateChange }:
     try {
       if (selectedFile) {
         const state = await uploadFileThroughPort(selectedFile, {
+          maxUploadBytes,
           target: {
             deviceIden: target.deviceIden,
             email: target.email,

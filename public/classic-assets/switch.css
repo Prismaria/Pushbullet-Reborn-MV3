@@ -63,3 +63,34 @@ input:checked + .slider:before {
 .slider.round:before {
     border-radius: 50%;
 }
+.badge-color-switch {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 20px;
+    vertical-align: middle;
+}
+.badge-color-input {
+    width: 0 !important;
+    height: 0 !important;
+    opacity: 0;
+}
+.badge-color-slider {
+    background-color: #4ab367;
+    transition: background-color 180ms ease;
+}
+.badge-color-slider:before {
+    transition: background-color 180ms ease, transform .3s;
+}
+input.badge-color-input:checked + .badge-color-slider {
+    background-color: #e85845;
+}
+input.badge-color-input:not(:checked) + .badge-color-slider {
+    background-color: #4ab367;
+}
+input.badge-color-input:checked + .badge-color-slider:before {
+    transform: translateX(16px);
+}
+input.badge-color-input:focus + .badge-color-slider {
+    box-shadow: 0 0 1px #e85845;
+}

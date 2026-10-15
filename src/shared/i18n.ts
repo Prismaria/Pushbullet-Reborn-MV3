@@ -12,7 +12,12 @@ const messages = {
   disconnect: 'Disconnect',
   pasteFirst: 'Paste an access token first.',
   validating: 'Validating your access token...',
-  invalidToken: 'Could not validate the access token.'
+  invalidToken: 'Could not validate the access token.',
+  largeUploadSetupTitle: 'Enable large-file uploads',
+  largeUploadSetupCopy: 'Your Pushbullet account supports uploads up to {limit}. Sign in to Pushbullet in this browser to enable large-file uploads.',
+  largeUploadSignIn: 'Sign in to Pushbullet',
+  largeUploadCheck: 'Check again',
+  largeUploadChecking: 'Checking Pushbullet sign-in...'
 } as const
 
 const german: Partial<Record<keyof typeof messages, string>> = {
@@ -25,7 +30,12 @@ const german: Partial<Record<keyof typeof messages, string>> = {
   connect: 'Verbinden',
   connected: 'Verbunden',
   disconnected: 'Getrennt.',
-  disconnect: 'Trennen'
+  disconnect: 'Trennen',
+  largeUploadSetupTitle: 'Große Dateien aktivieren',
+  largeUploadSetupCopy: 'Dein Pushbullet-Konto unterstützt Uploads bis zu {limit}. Melde dich in diesem Browser bei Pushbullet an, um große Dateien hochzuladen.',
+  largeUploadSignIn: 'Bei Pushbullet anmelden',
+  largeUploadCheck: 'Erneut prüfen',
+  largeUploadChecking: 'Pushbullet-Anmeldung wird geprüft...'
 }
 
 export type TranslationKey = keyof typeof messages
