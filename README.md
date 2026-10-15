@@ -1,6 +1,77 @@
-# Pushbullet Reborn and Classic (MV3)
+# Pushbullet Reborn and Classic — Chrome Extensions for Manifest V3
 
-Two component-based Manifest V3 frontends share the same typed service-worker backend: Reborn is the redesigned interface, while Classic reproduces the active legacy panel, options, chat, and welcome flows.
+Send links, notes, and files between Chrome and your Pushbullet devices, browse push history, and receive desktop notifications. Pushbullet Reborn and Classic bring two interface choices to a shared Manifest V3 extension backend.
+
+**[Download the latest release](https://github.com/Prismaria/Pushbullet-Reborn-MV3/releases/latest)** · **[Install in Chrome](#install-in-chrome)** · **[Frequently asked questions](#frequently-asked-questions)**
+
+## Features
+
+- **Link, note, and file sharing:** push to your devices, contacts, and subscribed channels, with upload progress and support for larger files within your account's limits. Incoming image pushes open in a background tab by default; you can turn this off in settings.
+- **Push history:** browse previous pushes, follow links, and open attachments. Classic includes device streams, previews, and automatic loading of older history.
+- **Desktop and mirrored notifications:** receive push alerts and phone notification mirrors with app icons, images, and mute/unmute controls. Missed pushes are checked after wake or reconnect.
+- **SMS and MMS:** view conversations and send messages or attachments through a compatible connected phone.
+- **Browser shortcuts:** push the current tab, use optional right-click sharing menus, or open conversations in a separate window.
+- **Interface preferences:** choose a redesigned or Classic-style interface, with dark mode and notification settings.
+
+## Reborn vs. Classic
+
+| | Reborn | Classic |
+| --- | --- | --- |
+| Interface | Redesigned popup, settings, and chat views | Recreates the legacy Pushbullet panel, options, and chat layout |
+| Best fit | You prefer the redesigned interface | You prefer the familiar Classic layout and device streams |
+| Release download | `pushbullet-reborn-<version>.zip` | `pushbullet-classic-<version>-<version_name>.zip` |
+
+Both variants share the same account connection, push delivery, notifications, and file-transfer backend. They are packaged as separate extensions; choose one to get started.
+
+This project is in beta. See the [release notes](https://github.com/Prismaria/Pushbullet-Reborn-MV3/releases) for recent changes and [Classic parity notes](CLASSIC_PARITY_FIXES.md) for implementation details and remaining comparison work.
+
+## Install in Chrome
+
+### From a GitHub Release
+
+1. Open the [latest GitHub Release](https://github.com/Prismaria/Pushbullet-Reborn-MV3/releases/latest) and download either `pushbullet-reborn-<version>.zip` or `pushbullet-classic-<version>-<version_name>.zip` from **Assets**.
+2. Extract the ZIP into a local folder. Chrome cannot load the ZIP file directly.
+3. Open `chrome://extensions` in Chrome.
+4. Enable **Developer mode** using the switch in the upper-right corner.
+5. Click **Load unpacked**.
+6. Select the extracted folder that directly contains `manifest.json`. Do not select the ZIP file, the repository root, or a parent folder.
+7. Open the extension from Chrome's Extensions menu and connect using an access token from your [Pushbullet account settings](https://www.pushbullet.com/#settings/account).
+
+The Reborn and Classic ZIPs are separate extensions. Load only the variant you want to use, or load both when comparing their behavior.
+
+### From a Local Build
+
+1. Install dependencies with `npm install`.
+2. Build Reborn with `npm run check`, or build Classic with `npm run check:classic`.
+3. Open `chrome://extensions` and enable **Developer mode**.
+4. Click **Load unpacked** and select `dist-reborn/` or `dist-classic/`.
+5. After rebuilding, return to `chrome://extensions` and click **Reload** on the corresponding extension.
+
+## Frequently asked questions
+
+### Does this Pushbullet extension use Manifest V3?
+
+Yes. Both Reborn and Classic use Chrome's Manifest V3 extension format. Classic recreates the legacy interface on the MV3 backend; it does not load the old Manifest V2 extension.
+
+### Which should I install: Reborn or Classic?
+
+Choose Classic for the familiar Pushbullet layout and device-based history, or Reborn for the redesigned interface. Both connect to the same Pushbullet service. You can install them separately to compare, but running both can produce duplicate alerts.
+
+### How do I install the downloaded ZIP in Chrome?
+
+Extract the extension ZIP, enable Developer mode at `chrome://extensions`, and select **Load unpacked**. Choose the extracted folder containing `manifest.json`. Use the extension ZIP under the release's **Assets**, rather than GitHub's automatically generated source-code archive. See [Install in Chrome](#install-in-chrome) for the full steps.
+
+### Do I need a Pushbullet account or a Pro subscription?
+
+You need a Pushbullet account and an access token from [account settings](https://www.pushbullet.com/#settings/account). Your account's plan and service limits still apply; this extension does not unlock Pro features. Large-file uploads also require signing into the same account on the Pushbullet website so the extension can use the account's upload credential.
+
+### Will it replace my existing Pushbullet extension and import its settings?
+
+Loading a GitHub build as an unpacked extension creates a separate installation. It cannot automatically read another extension's local settings or credentials. After connecting your account, it fetches your Pushbullet history from the service. Importing legacy local settings requires a compatible extension identity; see [Migration and Release](#migration-and-release).
+
+### Are all legacy Pushbullet features supported?
+
+The project supports push sharing, history, notifications, and SMS/MMS through compatible devices, but full legacy parity is still in progress. Mirrored-notification quick reply, Android action dispatch, channel moderation, and end-to-end encrypted payload support are not currently implemented. See [Advanced Feature Decisions](ADVANCED_FEATURES.md) for the current scope.
 
 ## Development
 
@@ -15,37 +86,13 @@ Build the redesigned unpacked extension into `dist-reborn/`:
 npm run check
 ```
 
-For local loading instructions, see [Install in Chrome](#install-in-chrome).
-
 Build the Classic pipeline into `dist-classic/`:
 
 ```bash
 npm run check:classic
 ```
 
-Load `dist-classic/` separately when comparing the Classic frontend with the legacy extension.
-
-## Install in Chrome
-
-### From a GitHub Release
-
-1. Download either `pushbullet-reborn-<version>.zip` or `pushbullet-classic-<version>-<version_name>.zip` from the GitHub Release.
-2. Extract the ZIP into a local folder. Chrome cannot load the ZIP file directly.
-3. Open `chrome://extensions` in Chrome.
-4. Enable **Developer mode** using the switch in the upper-right corner.
-5. Click **Load unpacked**.
-6. Select the extracted folder that directly contains `manifest.json`. Do not select the ZIP file, the repository root, or a parent folder.
-7. Open the extension from Chrome's Extensions menu and complete authentication in the extension UI.
-
-The Reborn and Classic ZIPs are separate extensions. Load only the variant you want to use, or load both when comparing their behavior.
-
-### From a Local Build
-
-1. Install dependencies with `npm install`.
-2. Build Reborn with `npm run check`, or build Classic with `npm run check:classic`.
-3. Open `chrome://extensions` and enable **Developer mode**.
-4. Click **Load unpacked** and select `dist-reborn/` or `dist-classic/`.
-5. After rebuilding, return to `chrome://extensions` and click **Reload** on the corresponding extension.
+For local loading instructions, see [Install in Chrome](#install-in-chrome). Load `dist-classic/` separately when comparing the Classic frontend with the legacy extension.
 
 ## Current Boundary
 
